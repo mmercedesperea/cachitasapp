@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
 import { isUuid, isDummyLocalUuid, getSlotDefaultUuid } from '../utils/uuid';
 
-async function withTimeout<T>(promise: PromiseLike<T>, ms = 500): Promise<T> {
+async function withTimeout<T>(promise: PromiseLike<T>, ms = 1000): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('Network timeout')), ms)
   );

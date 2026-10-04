@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 import { EquipmentItem, Exercise } from '../types';
 import { isUuid, isDummyLocalUuid } from '../utils/uuid';
 
-async function withTimeout<T>(promise: PromiseLike<T>, ms = 1500): Promise<T> {
+async function withTimeout<T>(promise: PromiseLike<T>, ms = 1000): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('Network timeout')), ms)
   );
@@ -441,7 +441,7 @@ export class EquipmentRepository {
   }
 
   static async getProfileEquipmentSlugs(profileId: string): Promise<string[]> {
-    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+    if (isUuid(profileId)) {
       try {
         const res: any = await withTimeout(
           supabase
@@ -469,7 +469,7 @@ export class EquipmentRepository {
 
   static async setProfileEquipmentSlugs(profileId: string, slugs: string[]): Promise<void> {
     localStorage.setItem(this.LOCAL_EQ_KEY + profileId, JSON.stringify(slugs));
-    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+    if (isUuid(profileId)) {
       try {
         await withTimeout(supabase.from('profile_equipment').delete().eq('profile_id', profileId));
         const allEq = await this.getAllEquipment();
@@ -510,7 +510,7 @@ export class ExerciseRepository {
   }
 
   static async getFavoriteExerciseIds(profileId: string): Promise<string[]> {
-    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+    if (isUuid(profileId)) {
       try {
         const res: any = await withTimeout(
           supabase
@@ -536,7 +536,7 @@ export class ExerciseRepository {
 
     localStorage.setItem(this.LOCAL_FAVS_KEY + profileId, JSON.stringify(updated));
 
-    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+    if (isUuid(profileId)) {
       try {
         if (exists) {
           await withTimeout(supabase.from('profile_favorite_exercises').delete().match({ profile_id: profileId, exercise_id: exerciseId }));

@@ -9,7 +9,7 @@ export class ProgramRepository {
   static async getActiveProgramForProfile(profileId: string): Promise<Program | null> {
     let program: Program | null = null;
 
-    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+    if (isUuid(profileId)) {
       try {
         const { data } = await supabase
           .from('programs')
@@ -80,7 +80,7 @@ export class ProgramRepository {
     const allDays = structuredWeeks.flatMap(w => w.days || []);
     localStorage.setItem(`cachitas_program_days_${program.id}`, JSON.stringify(allDays));
 
-    if (isUuid(program.profile_id) && !isDummyLocalUuid(program.profile_id)) {
+    if (isUuid(program.profile_id)) {
       try {
         await supabase.from('programs').upsert({
           id: program.id,
@@ -93,25 +93,29 @@ export class ProgramRepository {
           updated_at: program.updated_at
         });
 
-        for (const week of structuredWeeks) {
-          const { days, ...weekData } = week;
-          await supabase.from('program_weeks').upsert(weekData);
+        const weekRows = structuredWeeks.map(({ days, ...w }) => w);
+        if (weekRows.length > 0) {
+          await supabase.from('program_weeks').upsert(weekRows);
+        }
 
-          if (days) {
-            for (const day of days) {
-              const { exercises, ...dayData } = day;
-              await supabase.from('program_days').upsert({
-                ...dayData,
-                program_week_id: week.id,
-                week_number: week.week_number
-              });
+        const dayRows = structuredWeeks.flatMap(w =>
+          (w.days || []).map(({ exercises, ...d }) => ({
+            ...d,
+            program_week_id: w.id,
+            week_number: w.week_number
+          }))
+        );
+        if (dayRows.length > 0) {
+          await supabase.from('program_days').upsert(dayRows);
+        }
 
-              if (exercises && exercises.length > 0) {
-                const exRows = exercises.map(({ exercise, ...exData }) => exData);
-                await supabase.from('program_exercises').upsert(exRows);
-              }
-            }
-          }
+        const exerciseRows = structuredWeeks.flatMap(w =>
+          (w.days || []).flatMap(d =>
+            (d.exercises || []).map(({ exercise, ...exData }) => exData)
+          )
+        );
+        if (exerciseRows.length > 0) {
+          await supabase.from('program_exercises').upsert(exerciseRows);
         }
       } catch {
         await SyncService.enqueueOperation({
@@ -124,7 +128,7 @@ export class ProgramRepository {
   }
 
   static async getProgramWeeks(programId: string): Promise<(ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[]> {
-    if (isUuid(programId) && !isDummyLocalUuid(programId)) {
+    if (isUuid(programId)) {
       try {
         const { data: weeks } = await supabase
           .from('program_weeks')
@@ -185,7 +189,7 @@ export class ProgramRepository {
   }
 
   static async getProgramDays(programId: string): Promise<(ProgramDay & { exercises: ProgramExercise[] })[]> {
-    if (isUuid(programId) && !isDummyLocalUuid(programId)) {
+    if (isUuid(programId)) {
       try {
         const { data: days } = await supabase
           .from('program_days')
@@ -220,7 +224,7 @@ export class WorkoutRepository {
   private static LOCAL_SESSIONS_KEY = 'cachitas_workout_sessions_';
 
   static async getSessionsForProfile(profileId: string): Promise<WorkoutSession[]> {
-    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+    if (isUuid(profileId)) {
       try {
         const { data } = await supabase
           .from('workout_sessions')
@@ -248,7 +252,7 @@ export class WorkoutRepository {
     }
     localStorage.setItem(this.LOCAL_SESSIONS_KEY + session.profile_id, JSON.stringify(sessions));
 
-    if (isUuid(session.profile_id) && !isDummyLocalUuid(session.profile_id)) {
+    if (isUuid(session.profile_id)) {
       try {
         const { exercises, ...sessionData } = session;
         await supabase.from('workout_sessions').upsert(sessionData);
@@ -283,7 +287,7 @@ export class PersonalRecordRepository {
   private static LOCAL_PRS_KEY = 'cachitas_prs_';
 
   static async getPRsForProfile(profileId: string): Promise<PersonalRecord[]> {
-    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+    if (isUuid(profileId)) {
       try {
         const { data } = await supabase
           .from('personal_records')
@@ -310,7 +314,7 @@ export class PersonalRecordRepository {
     }
     localStorage.setItem(this.LOCAL_PRS_KEY + pr.profile_id, JSON.stringify(prs));
 
-    if (isUuid(pr.profile_id) && !isDummyLocalUuid(pr.profile_id)) {
+    if (isUuid(pr.profile_id)) {
       try {
         const { exercise, ...prData } = pr;
         await supabase.from('personal_records').upsert(prData);
@@ -329,7 +333,7 @@ export class BodyWeightRepository {
   private static LOCAL_BW_KEY = 'cachitas_bodyweight_';
 
   static async getEntriesForProfile(profileId: string): Promise<BodyWeightEntry[]> {
-    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+    if (isUuid(profileId)) {
       try {
         const { data } = await supabase
           .from('body_weight_entries')
@@ -358,7 +362,7 @@ export class BodyWeightRepository {
     entries.push(entry);
     localStorage.setItem(this.LOCAL_BW_KEY + profileId, JSON.stringify(entries));
 
-    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+    if (isUuid(profileId)) {
       try {
         await supabase.from('body_weight_entries').insert(entry);
       } catch {
@@ -387,7 +391,7 @@ export class PreferencesRepository {
       updated_at: new Date().toISOString()
     };
 
-    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+    if (isUuid(profileId)) {
       try {
         const { data } = await supabase
           .from('profile_preferences')
@@ -407,7 +411,7 @@ export class PreferencesRepository {
 
   static async savePreferences(prefs: ProfilePreferences): Promise<void> {
     localStorage.setItem(this.LOCAL_PREFS_KEY + prefs.profile_id, JSON.stringify(prefs));
-    if (isUuid(prefs.profile_id) && !isDummyLocalUuid(prefs.profile_id)) {
+    if (isUuid(prefs.profile_id)) {
       try {
         await supabase.from('profile_preferences').upsert(prefs);
       } catch {}
