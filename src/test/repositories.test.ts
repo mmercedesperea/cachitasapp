@@ -17,8 +17,8 @@ describe('Repositories and UUID handling', () => {
     expect(isUuid(undefined)).toBe(false);
   });
 
-  it('isDummyLocalUuid identifies placeholder UUIDs and legacy IDs', () => {
-    expect(isDummyLocalUuid('00000000-0000-0000-0000-000000000001')).toBe(true);
+  it('isDummyLocalUuid identifies legacy local IDs but allows slot default UUIDs for Supabase sync', () => {
+    expect(isDummyLocalUuid('00000000-0000-0000-0000-000000000001')).toBe(false);
     expect(isDummyLocalUuid('local-profile-slot-1')).toBe(true);
     expect(isDummyLocalUuid('c7b12345-6789-abcd-ef01-234567890abc')).toBe(false);
   });

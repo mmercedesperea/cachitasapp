@@ -5,7 +5,7 @@ export function isUuid(id: string | null | undefined): boolean {
 
 export function isDummyLocalUuid(id: string | null | undefined): boolean {
   if (!id) return false;
-  return id.startsWith('00000000-0000-0000-0000-') || id.startsWith('local-profile-slot-');
+  return id.startsWith('local-profile-slot-');
 }
 
 export function getSlotDefaultUuid(slot: number): string {
