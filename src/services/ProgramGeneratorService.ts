@@ -1,43 +1,84 @@
-import { Exercise, Program, ProgramDay, ProgramExercise } from '../types';
+import { Exercise, Program, ProgramWeek, ProgramDay, ProgramExercise } from '../types';
 import { EquipmentRepository, ExerciseRepository } from '../repositories/EquipmentAndExerciseRepository';
 import { ProgramRepository } from '../repositories/WorkoutAndOtherRepositories';
 
 export class ProgramGeneratorService {
   /**
-   * Generates a tailored 4-day Powerlifting / Strength program for a profile
-   * strictly filtering out exercises that require unselected equipment.
+   * Generates a complete 4-week training program for a profile.
+   * Leverages the "Favorite Exercise Pool" as top priority while ensuring
+   * biomechanical balance and proper 4-week block periodization/progression.
    */
   static async generateProgramForProfile(
     profileId: string,
     goal: string = 'Powerlifting',
     experienceLevel: string = 'Intermedio'
-  ): Promise<{ program: Program; days: (ProgramDay & { exercises: ProgramExercise[] })[] }> {
+  ): Promise<{
+    program: Program;
+    weeks: (ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[];
+  }> {
     const availableEquipmentSlugs = await EquipmentRepository.getProfileEquipmentSlugs(profileId);
     const allExercises = await ExerciseRepository.getAllExercises();
     const favoriteIds = await ExerciseRepository.getFavoriteExerciseIds(profileId);
 
-    // Filter exercises based on user's equipment
+    // Filter exercises strictly by available equipment
     const allowedExercises = allExercises.filter(ex => {
       if (!ex.equipment_required || ex.equipment_required.length === 0) return true;
       return ex.equipment_required.every(req => availableEquipmentSlugs.includes(req));
     });
 
-    const getBestExercise = (category: string, isCompound = true): Exercise => {
-      // First check favorites
-      const favMatch = allowedExercises.find(
-        e => favoriteIds.includes(e.id) && e.category === category && (!isCompound || e.is_compound)
-      );
+    const favExercises = allowedExercises.filter(ex => favoriteIds.includes(ex.id));
+
+    // Helper to pick exercise: favorite pool first, then category/pattern match, then fallback
+    const pickExercise = (
+      predicate: (ex: Exercise) => boolean,
+      fallbackCategory?: string
+    ): Exercise => {
+      const favMatch = favExercises.find(predicate);
       if (favMatch) return favMatch;
 
-      // Secondary check by category
-      const catMatch = allowedExercises.find(
-        e => e.category === category && (!isCompound || e.is_compound)
-      );
-      if (catMatch) return catMatch;
+      const allowedMatch = allowedExercises.find(predicate);
+      if (allowedMatch) return allowedMatch;
 
-      // Fallback
+      if (fallbackCategory) {
+        const catMatch = allowedExercises.find(e => e.category === fallbackCategory);
+        if (catMatch) return catMatch;
+      }
+
       return allowedExercises[0] || allExercises[0];
     };
+
+    // Main movements selection (using favorite pool when possible)
+    const squatMain = pickExercise(e => e.category === 'Squat' && e.is_compound, 'Squat');
+    const benchMain = pickExercise(e => e.category === 'Bench' && e.is_compound, 'Bench');
+    const deadliftMain = pickExercise(e => e.category === 'Deadlift' && e.is_compound, 'Deadlift');
+    const pressMain = pickExercise(
+      e => e.movement_pattern === 'Vertical Push' || (e.category === 'Upper body' && e.is_compound),
+      'Upper body'
+    );
+
+    // Accessories selection
+    const pullVertical = pickExercise(
+      e => e.movement_pattern === 'Vertical Pull' || e.slug === 'lat-pulldown',
+      'Upper body'
+    );
+    const pullHorizontal = pickExercise(
+      e => e.movement_pattern === 'Horizontal Pull' || e.slug === 'cable-row' || e.slug === 'barbell-row',
+      'Upper body'
+    );
+    const armBiceps = pickExercise(e => e.slug === 'cable-curl' || e.primary_muscles.includes('bíceps'), 'Upper body');
+    const armTriceps = pickExercise(
+      e => e.slug === 'rope-triceps-pushdown' || e.primary_muscles.includes('tríceps'),
+      'Upper body'
+    );
+    const squatSecondary = pickExercise(
+      e => (e.slug === 'paused-squat' || e.slug === 'front-squat' || e.slug === 'tempo-squat') && e.id !== squatMain.id,
+      'Squat'
+    );
+    const hingeSecondary = pickExercise(
+      e => (e.slug === 'romanian-deadlift' || e.slug === 'paused-deadlift' || e.slug === 'hip-thrust') && e.id !== deadliftMain.id,
+      'Deadlift'
+    );
+    const conditioningEx = pickExercise(e => e.is_conditioning || e.movement_pattern === 'Cardio', 'Conditioning');
 
     const programId = `program-${profileId}-${Date.now()}`;
     const newProgram: Program = {
@@ -51,75 +92,142 @@ export class ProgramGeneratorService {
       updated_at: new Date().toISOString()
     };
 
-    const squatEx = getBestExercise('Squat', true);
-    const benchEx = getBestExercise('Bench', true);
-    const deadliftEx = getBestExercise('Deadlift', true);
-    const upperEx = getBestExercise('Upper body', true);
-    const latPullEx = allowedExercises.find(e => e.slug === 'lat-pulldown') || upperEx;
-    const curlEx = allowedExercises.find(e => e.slug === 'cable-curl') || upperEx;
-    const tricepsEx = allowedExercises.find(e => e.slug === 'rope-triceps-pushdown') || upperEx;
-    const rowEx = allowedExercises.find(e => e.slug === 'cable-row') || upperEx;
-    const pausedSquatEx = allowedExercises.find(e => e.slug === 'paused-squat') || squatEx;
-    const rdlEx = allowedExercises.find(e => e.slug === 'romanian-deadlift') || deadliftEx;
-    const cardioEx = allowedExercises.find(e => e.is_conditioning) || squatEx;
+    // 4-Week progression configurations
+    const weekConfigs = [
+      {
+        weekNum: 1,
+        name: 'Semana 1: Base',
+        focus: 'Acumulación y técnica (RPE 7-8)',
+        rpeOffset: 0,
+        setMultiplier: 1,
+        repOffset: 0
+      },
+      {
+        weekNum: 2,
+        name: 'Semana 2: Progresión',
+        focus: 'Incremento de carga e intensidad (RPE 7.5-8.5)',
+        rpeOffset: 0.5,
+        setMultiplier: 1,
+        repOffset: 0
+      },
+      {
+        weekNum: 3,
+        name: 'Semana 3: Semana Fuerte',
+        focus: 'Máxima exigencia y picos de fuerza (RPE 8-9)',
+        rpeOffset: 1.0,
+        setMultiplier: 1,
+        repOffset: -1 // High intensity, lower reps
+      },
+      {
+        weekNum: 4,
+        name: 'Semana 4: Deload / Consolidación',
+        focus: 'Descarga activa y recuperación (RPE 6-7)',
+        rpeOffset: -1.0,
+        setMultiplier: 0.7,
+        repOffset: 0
+      }
+    ];
 
-    const days: (ProgramDay & { exercises: ProgramExercise[] })[] = [
+    const templateDays = [
       {
-        id: `day-1-${programId}`,
-        program_id: programId,
-        day_number: 1,
-        name: 'Día 1 — Squat Strength',
-        description: 'Fuerza principal de sentadilla y banca complementaria',
+        dayNum: 1,
+        name: 'Lunes — Squat Day',
+        desc: 'Enfoque en fuerza de Sentadilla y complementarios',
         exercises: [
-          { id: `pe-1-1`, program_day_id: `day-1-${programId}`, exercise_id: squatEx.id, exercise_order: 1, target_sets: 5, target_reps: 5, target_rpe: 8, rest_seconds: 180, exercise: squatEx },
-          { id: `pe-1-2`, program_day_id: `day-1-${programId}`, exercise_id: benchEx.id, exercise_order: 2, target_sets: 4, target_reps: 6, target_rpe: 8, rest_seconds: 120, exercise: benchEx },
-          { id: `pe-1-3`, program_day_id: `day-1-${programId}`, exercise_id: latPullEx.id, exercise_order: 3, target_sets: 4, target_reps: 10, target_rpe: 8, rest_seconds: 90, exercise: latPullEx },
-          { id: `pe-1-4`, program_day_id: `day-1-${programId}`, exercise_id: curlEx.id, exercise_order: 4, target_sets: 3, target_reps: 12, target_rpe: 8, rest_seconds: 60, exercise: curlEx },
-          { id: `pe-1-5`, program_day_id: `day-1-${programId}`, exercise_id: cardioEx.id, exercise_order: 5, target_sets: 1, target_reps: 10, target_rpe: 6, rest_seconds: 60, exercise: cardioEx }
+          { ex: squatMain, baseSets: 5, baseReps: 5, baseRpe: 7.5, rest: 180 },
+          { ex: benchMain, baseSets: 4, baseReps: 6, baseRpe: 7.5, rest: 120 },
+          { ex: pullVertical, baseSets: 4, baseReps: 10, baseRpe: 7.5, rest: 90 },
+          { ex: armBiceps, baseSets: 3, baseReps: 12, baseRpe: 8.0, rest: 60 },
+          { ex: conditioningEx, baseSets: 1, baseReps: 10, baseRpe: 6.0, rest: 60 }
         ]
       },
       {
-        id: `day-2-${programId}`,
-        program_id: programId,
-        day_number: 2,
-        name: 'Día 2 — Bench Strength',
-        description: 'Fuerza de press banca y empuje vertical',
+        dayNum: 2,
+        name: 'Martes — Bench Day',
+        desc: 'Enfoque en Press Banca y empuje de torso',
         exercises: [
-          { id: `pe-2-1`, program_day_id: `day-2-${programId}`, exercise_id: benchEx.id, exercise_order: 1, target_sets: 5, target_reps: 5, target_rpe: 8.5, rest_seconds: 180, exercise: benchEx },
-          { id: `pe-2-2`, program_day_id: `day-2-${programId}`, exercise_id: upperEx.id, exercise_order: 2, target_sets: 4, target_reps: 6, target_rpe: 8, rest_seconds: 120, exercise: upperEx },
-          { id: `pe-2-3`, program_day_id: `day-2-${programId}`, exercise_id: rowEx.id, exercise_order: 3, target_sets: 4, target_reps: 10, target_rpe: 8, rest_seconds: 90, exercise: rowEx },
-          { id: `pe-2-4`, program_day_id: `day-2-${programId}`, exercise_id: tricepsEx.id, exercise_order: 4, target_sets: 3, target_reps: 12, target_rpe: 8, rest_seconds: 60, exercise: tricepsEx }
+          { ex: benchMain, baseSets: 5, baseReps: 5, baseRpe: 8.0, rest: 180 },
+          { ex: pressMain, baseSets: 4, baseReps: 6, baseRpe: 7.5, rest: 120 },
+          { ex: pullHorizontal, baseSets: 4, baseReps: 10, baseRpe: 7.5, rest: 90 },
+          { ex: armTriceps, baseSets: 3, baseReps: 12, baseRpe: 8.0, rest: 60 }
         ]
       },
       {
-        id: `day-3-${programId}`,
-        program_id: programId,
-        day_number: 3,
-        name: 'Día 3 — Deadlift Strength',
-        description: 'Fuerza de peso muerto y sentadilla secundaria',
+        dayNum: 3,
+        name: 'Jueves — Deadlift Day',
+        desc: 'Enfoque en Peso Muerto y variante de Sentadilla',
         exercises: [
-          { id: `pe-3-1`, program_day_id: `day-3-${programId}`, exercise_id: deadliftEx.id, exercise_order: 1, target_sets: 5, target_reps: 3, target_rpe: 8.5, rest_seconds: 180, exercise: deadliftEx },
-          { id: `pe-3-2`, program_day_id: `day-3-${programId}`, exercise_id: pausedSquatEx.id, exercise_order: 2, target_sets: 3, target_reps: 6, target_rpe: 8, rest_seconds: 120, exercise: pausedSquatEx },
-          { id: `pe-3-3`, program_day_id: `day-3-${programId}`, exercise_id: latPullEx.id, exercise_order: 3, target_sets: 4, target_reps: 10, target_rpe: 8, rest_seconds: 90, exercise: latPullEx },
-          { id: `pe-3-4`, program_day_id: `day-3-${programId}`, exercise_id: curlEx.id, exercise_order: 4, target_sets: 3, target_reps: 12, target_rpe: 8, rest_seconds: 60, exercise: curlEx }
+          { ex: deadliftMain, baseSets: 5, baseReps: 3, baseRpe: 8.0, rest: 180 },
+          { ex: squatSecondary, baseSets: 3, baseReps: 6, baseRpe: 7.5, rest: 120 },
+          { ex: pullVertical, baseSets: 4, baseReps: 10, baseRpe: 7.5, rest: 90 },
+          { ex: armBiceps, baseSets: 3, baseReps: 12, baseRpe: 8.0, rest: 60 }
         ]
       },
       {
-        id: `day-4-${programId}`,
-        program_id: programId,
-        day_number: 4,
-        name: 'Día 4 — Strength + Conditioning',
-        description: 'Volumen e hipertrofia de accesorios + acondicionamiento',
+        dayNum: 4,
+        name: 'Viernes — Strength + Conditioning',
+        desc: 'Fuerza secundaria, accesorios e hipertrofia',
         exercises: [
-          { id: `pe-4-1`, program_day_id: `day-4-${programId}`, exercise_id: benchEx.id, exercise_order: 1, target_sets: 4, target_reps: 8, target_rpe: 8, rest_seconds: 120, exercise: benchEx },
-          { id: `pe-4-2`, program_day_id: `day-4-${programId}`, exercise_id: squatEx.id, exercise_order: 2, target_sets: 4, target_reps: 6, target_rpe: 8, rest_seconds: 120, exercise: squatEx },
-          { id: `pe-4-3`, program_day_id: `day-4-${programId}`, exercise_id: rdlEx.id, exercise_order: 3, target_sets: 3, target_reps: 8, target_rpe: 8, rest_seconds: 90, exercise: rdlEx },
-          { id: `pe-4-4`, program_day_id: `day-4-${programId}`, exercise_id: cardioEx.id, exercise_order: 4, target_sets: 1, target_reps: 15, target_rpe: 7, rest_seconds: 60, exercise: cardioEx }
+          { ex: benchMain, baseSets: 4, baseReps: 8, baseRpe: 7.5, rest: 120 },
+          { ex: squatMain, baseSets: 4, baseReps: 6, baseRpe: 7.5, rest: 120 },
+          { ex: hingeSecondary, baseSets: 3, baseReps: 8, baseRpe: 7.5, rest: 90 },
+          { ex: conditioningEx, baseSets: 1, baseReps: 15, baseRpe: 7.0, rest: 60 }
         ]
       }
     ];
 
-    await ProgramRepository.saveProgram(newProgram, days);
-    return { program: newProgram, days };
+    const weeks: (ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[] = [];
+
+    for (const wConfig of weekConfigs) {
+      const weekId = `week-${wConfig.weekNum}-${programId}`;
+      const daysForWeek: (ProgramDay & { exercises: ProgramExercise[] })[] = [];
+
+      for (const tDay of templateDays) {
+        const dayId = `day-w${wConfig.weekNum}-d${tDay.dayNum}-${programId}`;
+
+        const exercisesForDay: ProgramExercise[] = tDay.exercises.map((tEx, index) => {
+          const targetSets = Math.max(1, Math.round(tEx.baseSets * wConfig.setMultiplier));
+          const targetReps = Math.max(1, tEx.baseReps + wConfig.repOffset);
+          const targetRpe = Math.min(10, Math.max(5, tEx.baseRpe + wConfig.rpeOffset));
+          const isFav = favoriteIds.includes(tEx.ex.id);
+
+          return {
+            id: `pe-w${wConfig.weekNum}-d${tDay.dayNum}-${index + 1}-${programId}`,
+            program_day_id: dayId,
+            exercise_id: tEx.ex.id,
+            exercise_order: index + 1,
+            target_sets: targetSets,
+            target_reps: targetReps,
+            target_rpe: targetRpe,
+            rest_seconds: tEx.rest,
+            is_favorite: isFav,
+            exercise: tEx.ex
+          };
+        });
+
+        daysForWeek.push({
+          id: dayId,
+          program_id: programId,
+          program_week_id: weekId,
+          week_number: wConfig.weekNum,
+          day_number: tDay.dayNum,
+          name: tDay.name,
+          description: tDay.desc,
+          exercises: exercisesForDay
+        });
+      }
+
+      weeks.push({
+        id: weekId,
+        program_id: programId,
+        week_number: wConfig.weekNum,
+        name: wConfig.name,
+        focus: wConfig.focus,
+        days: daysForWeek
+      });
+    }
+
+    await ProgramRepository.saveProgram(newProgram, weeks);
+    return { program: newProgram, weeks };
   }
 }

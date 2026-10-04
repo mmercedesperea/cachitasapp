@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, Plus, Minus, Timer, Disc, Award, ChevronLeft } from 'lucide-react';
-import { Profile, WorkoutSession, PersonalRecord, Exercise } from '../types';
+import { Check, Plus, Minus, Timer, Disc, Award, ChevronLeft, Sparkles, Heart } from 'lucide-react';
+import { Profile, WorkoutSession, PersonalRecord, Exercise, ProgramDay, ProgramExercise } from '../types';
 import { WorkoutRepository, ProgramRepository, PersonalRecordRepository } from '../repositories/WorkoutAndOtherRepositories';
+import { ProfileRepository } from '../repositories/ProfileRepository';
 import { ExerciseRepository } from '../repositories/EquipmentAndExerciseRepository';
 import { ProgressionService } from '../services/ProgressionService';
 import { PersonalRecordService } from '../services/PersonalRecordService';
@@ -14,6 +15,15 @@ interface WorkoutPageProps {
   onBack: () => void;
 }
 
+const SET_MOTIVATIONAL_MESSAGES = [
+  '💪 ¡UNA MÁS!',
+  '⚡ ¡BRUTAL!',
+  '💥 ¡VAMOS!',
+  '😎 ¡Imparable!',
+  '🔥 ¡Serie destrozada!',
+  '✨ ¡Excelente forma!'
+];
+
 export const WorkoutPage: React.FC<WorkoutPageProps> = ({
   profile,
   programDayId,
@@ -25,6 +35,8 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
   const [activeRestSeconds, setActiveRestSeconds] = useState<number | null>(null);
   const [isRestTimerRunning, setIsRestTimerRunning] = useState(false);
   const [newPRCelebration, setNewPRCelebration] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [workoutCompleteModal, setWorkoutCompleteModal] = useState(false);
   const [selectedBarbellWeight, setSelectedBarbellWeight] = useState<number | null>(null);
   const [plateBreakdown, setPlateBreakdown] = useState<PlateBreakdown | null>(null);
 
@@ -61,11 +73,18 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
       if (programDayId) {
         const program = await ProgramRepository.getActiveProgramForProfile(profile.id);
         if (program) {
-          const days = await ProgramRepository.getProgramDays(program.id);
-          const currentDay = days.find(d => d.id === programDayId);
+          const weeks = await ProgramRepository.getProgramWeeks(program.id);
+          let foundDay: ProgramDay | undefined;
+          for (const w of weeks) {
+            const match = w.days?.find((d: ProgramDay) => d.id === programDayId);
+            if (match) {
+              foundDay = match;
+              break;
+            }
+          }
 
-          if (currentDay && currentDay.exercises) {
-            exercisesToLoad = currentDay.exercises.map(pe => ({
+          if (foundDay && foundDay.exercises) {
+            exercisesToLoad = foundDay.exercises.map((pe: ProgramExercise) => ({
               exercise: pe.exercise!,
               targetSets: pe.target_sets || 4,
               targetReps: pe.target_reps || 6,
@@ -129,6 +148,11 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
     setLoading(false);
   };
 
+  const showMotivationalToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
   const handleToggleSetComplete = async (weIndex: number, setIndex: number) => {
     if (!session || !session.exercises) return;
 
@@ -158,6 +182,9 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
     if (newCompletedState) {
       setActiveRestSeconds(120);
       setIsRestTimerRunning(true);
+
+      const randomMsg = SET_MOTIVATIONAL_MESSAGES[Math.floor(Math.random() * SET_MOTIVATIONAL_MESSAGES.length)];
+      showMotivationalToast(randomMsg);
 
       const exerciseId = exercises[weIndex].exercise_id;
       const existingPRs = await PersonalRecordRepository.getPRsForProfile(profile.id);
@@ -224,51 +251,73 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
       )
     };
     await WorkoutRepository.saveWorkoutSession(completedSession);
-    onFinishWorkout();
+
+    // Update Profile XP
+    await ProfileRepository.updateProfile({
+      id: profile.id,
+      xp: (profile.xp || 0) + 100
+    });
+
+    setWorkoutCompleteModal(true);
   };
 
   if (loading || !session) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-lime-400"></div>
+      <div className="p-8 flex flex-col items-center justify-center min-h-[60vh] gap-3">
+        <div className="animate-bounce text-4xl">🐱</div>
+        <div className="font-black text-pink-400 text-sm tracking-wide animate-pulse">
+          Preparando tu sesión...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-28 max-w-2xl mx-auto p-4 sm:p-6">
+    <div className="space-y-6 pb-28 max-w-2xl mx-auto p-4 sm:p-6 font-sans">
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-zinc-100 cursor-pointer"
+          className="p-2 bg-zinc-900 border-2 border-zinc-800 rounded-2xl text-zinc-400 hover:text-white cursor-pointer shadow-[2px_2px_0px_0px_#000]"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
 
         <div className="text-center">
-          <h1 className="text-lg font-black text-zinc-100">Sesión en Curso</h1>
-          <p className="text-[11px] text-zinc-400 font-medium">
-            Volumen Total: <span className="text-lime-400 font-bold">{session.total_volume} kg</span>
+          <div className="flex items-center gap-1.5 justify-center">
+            <span className="text-lg">{profile.avatar || '🐱'}</span>
+            <h1 className="text-base font-black text-white">Sesión en Curso</h1>
+          </div>
+          <p className="text-[11px] text-zinc-400 font-bold mt-0.5">
+            Carga acumulada: <span className="text-pink-400">{session.total_volume} kg</span>
           </p>
         </div>
 
         <button
           onClick={handleCompleteWorkout}
-          className="bg-lime-400 hover:bg-lime-300 text-zinc-950 font-black text-xs px-3.5 py-2 rounded-xl active:scale-95 transition-all cursor-pointer"
+          className="bg-pink-500 hover:bg-pink-600 text-white font-black text-xs px-3.5 py-2 rounded-2xl border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-y-0.5 transition-all cursor-pointer"
         >
-          Finalizar
+          Finalizar 🎉
         </button>
       </div>
+
+      {/* Motivational Toast Banner */}
+      {toastMessage && (
+        <div className="bg-pink-500 text-white font-black text-xs px-4 py-2.5 rounded-2xl border-2 border-black shadow-[4px_4px_0px_0px_#000] text-center animate-in zoom-in-95">
+          {toastMessage}
+        </div>
+      )}
 
       {/* Exercises & Sets List */}
       <div className="space-y-6">
         {session.exercises?.map((we, weIndex) => (
-          <div key={we.id} className="bg-zinc-900/90 border border-zinc-800 rounded-3xl p-5 space-y-4">
+          <div key={we.id} className="bg-zinc-900/90 border-2 border-zinc-800 rounded-3xl p-5 space-y-4 shadow-[4px_4px_0px_0px_#000]">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-black text-zinc-100">{we.exercise?.name}</h3>
-                <p className="text-[11px] text-zinc-400 font-medium">
+                <h3 className="text-base font-black text-white flex items-center gap-1.5">
+                  {we.exercise?.name}
+                </h3>
+                <p className="text-[11px] text-pink-300 font-bold mt-0.5">
                   {we.exercise?.category} • Objetivo: 4 × 5 @ {we.sets?.[0]?.target_weight || 80} kg
                 </p>
               </div>
@@ -276,30 +325,30 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
               {we.exercise?.equipment_required?.includes('barra-olimpica') && (
                 <button
                   onClick={() => handleOpenPlateCalculator(we.sets?.[0]?.actual_weight || 80)}
-                  className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-300 transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+                  className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-zinc-200 transition cursor-pointer flex items-center gap-1 text-xs font-bold border border-zinc-700"
                   title="Calculadora de discos"
                 >
-                  <Disc className="w-4 h-4 text-lime-400" />
+                  <Disc className="w-4 h-4 text-pink-400" />
                   <span>Discos</span>
                 </button>
               )}
             </div>
 
-            <div className="grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-zinc-500 text-center px-1">
+            <div className="grid grid-cols-12 gap-2 text-[10px] uppercase font-black text-zinc-400 text-center px-1">
               <span className="col-span-2 text-left">Serie</span>
               <span className="col-span-4">Peso (kg)</span>
               <span className="col-span-3">Reps</span>
-              <span className="col-span-3">Completado</span>
+              <span className="col-span-3">Hecho</span>
             </div>
 
             <div className="space-y-2.5">
               {we.sets?.map((st, setIndex) => (
                 <div
                   key={st.id}
-                  className={`grid grid-cols-12 gap-2 items-center p-2.5 rounded-2xl border transition-all ${
+                  className={`grid grid-cols-12 gap-2 items-center p-2.5 rounded-2xl border-2 transition-all ${
                     st.completed
-                      ? 'bg-lime-950/20 border-lime-500/40 text-zinc-100'
-                      : 'bg-zinc-950/60 border-zinc-800/80 text-zinc-300'
+                      ? 'bg-pink-500/20 border-pink-500 text-white shadow-[2px_2px_0px_0px_#ec4899]'
+                      : 'bg-zinc-950/80 border-zinc-800/90 text-zinc-300'
                   }`}
                 >
                   <span className="col-span-2 text-xs font-black text-zinc-400 pl-1">
@@ -309,16 +358,16 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
                   <div className="col-span-4 flex items-center justify-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
                     <button
                       onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_weight', -2.5)}
-                      className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90"
+                      className="p-1 text-zinc-400 hover:text-white active:scale-90 font-black cursor-pointer"
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="text-xs font-bold text-zinc-100 w-10 text-center">
+                    <span className="text-xs font-black text-white w-10 text-center">
                       {st.actual_weight}
                     </span>
                     <button
                       onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_weight', 2.5)}
-                      className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90"
+                      className="p-1 text-zinc-400 hover:text-white active:scale-90 font-black cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
@@ -327,16 +376,16 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
                   <div className="col-span-3 flex items-center justify-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
                     <button
                       onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_reps', -1)}
-                      className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90"
+                      className="p-1 text-zinc-400 hover:text-white active:scale-90 font-black cursor-pointer"
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="text-xs font-bold text-zinc-100 w-6 text-center">
+                    <span className="text-xs font-black text-white w-6 text-center">
                       {st.actual_reps}
                     </span>
                     <button
                       onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_reps', 1)}
-                      className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90"
+                      className="p-1 text-zinc-400 hover:text-white active:scale-90 font-black cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
@@ -345,10 +394,10 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
                   <div className="col-span-3 flex justify-center">
                     <button
                       onClick={() => handleToggleSetComplete(weIndex, setIndex)}
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all cursor-pointer active:scale-90 ${
+                      className={`w-10 h-10 rounded-2xl flex items-center justify-center border-2 transition-all cursor-pointer active:scale-90 ${
                         st.completed
-                          ? 'bg-lime-400 border-lime-400 text-zinc-950 shadow-md shadow-lime-400/20'
-                          : 'bg-zinc-900 border-zinc-700 text-transparent hover:border-zinc-500'
+                          ? 'bg-pink-500 border-black text-white shadow-[2px_2px_0px_0px_#000]'
+                          : 'bg-zinc-900 border-zinc-700 text-transparent hover:border-pink-400'
                       }`}
                     >
                       <Check className="w-5 h-5 stroke-[3]" />
@@ -361,11 +410,12 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
         ))}
       </div>
 
+      {/* Rest Timer Floating Bar */}
       {isRestTimerRunning && activeRestSeconds !== null && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-zinc-900/95 border border-lime-500/50 backdrop-blur-md px-6 py-3 rounded-full flex items-center gap-4 shadow-2xl z-40">
-          <div className="flex items-center gap-2 text-lime-400">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-zinc-900/95 border-2 border-pink-500 backdrop-blur-md px-6 py-3 rounded-full flex items-center gap-4 shadow-[6px_6px_0px_0px_#000] z-40">
+          <div className="flex items-center gap-2 text-pink-400">
             <Timer className="w-5 h-5 animate-pulse" />
-            <span className="font-mono text-lg font-black tracking-widest text-zinc-100">
+            <span className="font-mono text-lg font-black tracking-widest text-white">
               {Math.floor(activeRestSeconds / 60)
                 .toString()
                 .padStart(2, '0')}
@@ -377,13 +427,13 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
           <div className="flex items-center gap-2 border-l border-zinc-800 pl-3">
             <button
               onClick={() => setActiveRestSeconds(prev => (prev || 0) + 30)}
-              className="text-xs font-bold bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 rounded-lg text-zinc-200"
+              className="text-xs font-bold bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 rounded-xl text-white cursor-pointer"
             >
               +30s
             </button>
             <button
               onClick={() => setIsRestTimerRunning(false)}
-              className="text-xs font-bold text-red-400 hover:text-red-300 px-2 py-1"
+              className="text-xs font-bold text-red-400 hover:text-red-300 px-2 py-1 cursor-pointer"
             >
               Saltar
             </button>
@@ -391,54 +441,82 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
         </div>
       )}
 
+      {/* PR Celebration Modal */}
       {newPRCelebration && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-amber-500/50 rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl animate-in zoom-in-95">
-            <div className="w-16 h-16 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mx-auto text-amber-400">
-              <Award className="w-8 h-8" />
-            </div>
-            <h3 className="text-xl font-black text-amber-400">¡NUEVO RÉCORD!</h3>
-            <p className="text-sm text-zinc-200 font-medium">{newPRCelebration}</p>
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border-2 border-amber-400 rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-[8px_8px_0px_0px_#f59e0b] animate-in zoom-in-95">
+            <div className="text-5xl">{profile.avatar || '🐱'}</div>
+            <h3 className="text-2xl font-black text-amber-400">✨ ¡NUEVO PR! 🏆</h3>
+            <p className="text-xs text-zinc-200 font-bold">{newPRCelebration}</p>
             <button
               onClick={() => setNewPRCelebration(null)}
-              className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-3 rounded-xl text-xs mt-2"
+              className="w-full bg-amber-400 hover:bg-amber-300 text-black font-black py-3 rounded-2xl text-xs border-2 border-black shadow-[3px_3px_0px_0px_#000] cursor-pointer"
             >
-              ¡A POR MÁS!
+              ¡SEGUIR A FUEGO! 🔥
             </button>
           </div>
         </div>
       )}
 
+      {/* Workout Finish Celebration Modal */}
+      {workoutCompleteModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border-2 border-pink-500 rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-[8px_8px_0px_0px_#ec4899] animate-in zoom-in-95">
+            <div className="text-5xl">{profile.avatar || '🐼'}</div>
+            <h2 className="text-2xl font-black text-white">🎉 ¡MISIÓN COMPLETADA!</h2>
+            <p className="text-xs text-pink-300 font-bold">
+              "¡Brutal sesión! +100 XP añadidos a tu perfil."
+            </p>
+
+            <div className="bg-zinc-950 p-3 rounded-2xl border border-zinc-800 text-xs space-y-1 font-bold text-zinc-300">
+              <div>Carga Total: <span className="text-pink-400">{session.total_volume} kg</span></div>
+              <div>Duración: <span className="text-amber-400">~{Math.round((session.duration_seconds || 2400) / 60)} min</span></div>
+            </div>
+
+            <button
+              onClick={() => {
+                setWorkoutCompleteModal(false);
+                onFinishWorkout();
+              }}
+              className="w-full bg-pink-500 hover:bg-pink-600 text-white font-black py-3 rounded-2xl text-xs border-2 border-black shadow-[3px_3px_0px_0px_#000] cursor-pointer"
+            >
+              VOLVER AL INICIO ✨
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Plate Calculator Modal */}
       {selectedBarbellWeight && plateBreakdown && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 max-w-xs w-full space-y-4 text-center shadow-2xl">
+          <div className="bg-zinc-900 border-2 border-zinc-800 rounded-3xl p-6 max-w-xs w-full space-y-4 text-center shadow-[6px_6px_0px_0px_#000]">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <span className="text-xs font-extrabold text-zinc-400 uppercase">Barra {selectedBarbellWeight} kg</span>
+              <span className="text-xs font-black text-pink-400 uppercase">Barra {selectedBarbellWeight} kg</span>
               <button
                 onClick={() => setSelectedBarbellWeight(null)}
-                className="text-xs text-zinc-400 hover:text-zinc-100"
+                className="text-xs text-zinc-400 hover:text-white font-bold cursor-pointer"
               >
                 Cerrar
               </button>
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs text-zinc-400">
-                Peso por lado: <span className="text-lime-400 font-bold">{plateBreakdown.weightPerSide} kg</span>
+              <p className="text-xs text-zinc-300 font-bold">
+                Peso por lado: <span className="text-pink-400 font-black">{plateBreakdown.weightPerSide} kg</span>
               </p>
 
               <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
                 {plateBreakdown.platesPerSide.length > 0 ? (
                   plateBreakdown.platesPerSide.map(item => (
-                    <div key={item.plate} className="flex justify-between items-center text-xs font-bold text-zinc-200">
+                    <div key={item.plate} className="flex justify-between items-center text-xs font-bold text-white">
                       <span>Disco {item.plate} kg</span>
-                      <span className="bg-lime-400/10 border border-lime-400/30 text-lime-400 px-2.5 py-1 rounded-lg">
+                      <span className="bg-pink-500/20 border border-pink-500/40 text-pink-300 px-2.5 py-1 rounded-lg">
                         × {item.count}
                       </span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-zinc-500">Solo barra olímpica de 20 kg</p>
+                  <p className="text-xs text-zinc-500 font-bold">Solo barra olímpica de 20 kg</p>
                 )}
               </div>
             </div>

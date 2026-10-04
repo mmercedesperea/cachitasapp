@@ -3,6 +3,7 @@ import { PinService } from '../services/PinService';
 import { ProgressionService } from '../services/ProgressionService';
 import { PersonalRecordService } from '../services/PersonalRecordService';
 import { PlateCalculatorService } from '../services/PlateCalculatorService';
+import { ProgramGeneratorService } from '../services/ProgramGeneratorService';
 
 describe('PinService', () => {
   it('hashes a 4-digit PIN deterministically using SHA-256', async () => {
@@ -102,5 +103,20 @@ describe('PlateCalculatorService', () => {
     expect(breakdown.weightPerSide).toBe(40);
     expect(breakdown.platesPerSide).toEqual([{ plate: 20, count: 2 }]);
     expect(breakdown.remainder).toBe(0);
+  });
+});
+
+describe('ProgramGeneratorService', () => {
+  it('generates a 4-week program structure with proper week progression', async () => {
+    const { program, weeks } = await ProgramGeneratorService.generateProgramForProfile('test-profile-1');
+    expect(program.active).toBe(true);
+    expect(weeks).toHaveLength(4);
+
+    expect(weeks[0].week_number).toBe(1);
+    expect(weeks[1].week_number).toBe(2);
+    expect(weeks[2].week_number).toBe(3);
+    expect(weeks[3].week_number).toBe(4);
+
+    expect(weeks[0].days).toHaveLength(4);
   });
 });

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Dumbbell, BookOpen, TrendingUp, User, WifiOff } from 'lucide-react';
+import { Home, Calendar, Dumbbell, BookOpen, TrendingUp, User, WifiOff } from 'lucide-react';
 import { useAppStore } from './stores/useAppStore';
 import { ProfileSelectorPage } from './components/ProfileSelectorPage';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { Dashboard } from './components/Dashboard';
+import { PlanPage } from './components/PlanPage';
 import { ExercisesCatalog } from './components/ExercisesCatalog';
 import { WorkoutPage } from './components/WorkoutPage';
 import { ProgressPage } from './components/ProgressPage';
@@ -21,7 +22,7 @@ export const App: React.FC = () => {
     setOfflineStatus
   } = useAppStore();
 
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'workout' | 'exercises' | 'progress' | 'profile'>('dashboard');
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'plan' | 'workout' | 'exercises' | 'progress' | 'profile'>('dashboard');
   const [onboardingProfile, setOnboardingProfile] = useState<Profile | null>(null);
   const [activeWorkoutProgramDayId, setActiveWorkoutProgramDayId] = useState<string | undefined>(undefined);
 
@@ -70,7 +71,7 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-lime-400 selection:text-zinc-950">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-pink-500 selection:text-white">
       {/* Offline Status Banner */}
       {isOffline && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-400 text-[11px] font-extrabold px-4 py-1.5 flex items-center justify-center gap-2">
@@ -86,6 +87,14 @@ export const App: React.FC = () => {
             profile={activeProfile}
             onStartWorkout={handleStartWorkout}
             onNavigateToProgress={() => setCurrentTab('progress')}
+            onNavigateToPlan={() => setCurrentTab('plan')}
+          />
+        )}
+
+        {currentTab === 'plan' && (
+          <PlanPage
+            profile={activeProfile}
+            onStartWorkout={handleStartWorkout}
           />
         )}
 
@@ -116,56 +125,66 @@ export const App: React.FC = () => {
       </main>
 
       {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900/90 border-t border-zinc-800/80 backdrop-blur-lg z-40">
-        <div className="max-w-md mx-auto grid grid-cols-5 h-16">
+      <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 border-t-2 border-zinc-800 backdrop-blur-lg z-40">
+        <div className="max-w-md mx-auto grid grid-cols-6 h-16">
           <button
             onClick={() => setCurrentTab('dashboard')}
             className={`flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-              currentTab === 'dashboard' ? 'text-lime-400' : 'text-zinc-500 hover:text-zinc-300'
+              currentTab === 'dashboard' ? 'text-pink-400 font-black scale-105' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             <Home className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Inicio</span>
+            <span className="text-[9px] font-bold">Inicio</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentTab('plan')}
+            className={`flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+              currentTab === 'plan' ? 'text-pink-400 font-black scale-105' : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Calendar className="w-5 h-5" />
+            <span className="text-[9px] font-bold">Plan</span>
           </button>
 
           <button
             onClick={() => handleStartWorkout()}
             className={`flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-              currentTab === 'workout' ? 'text-lime-400' : 'text-zinc-500 hover:text-zinc-300'
+              currentTab === 'workout' ? 'text-pink-400 font-black scale-105' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             <Dumbbell className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Entrenar</span>
+            <span className="text-[9px] font-bold">Entrenar</span>
           </button>
 
           <button
             onClick={() => setCurrentTab('exercises')}
             className={`flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-              currentTab === 'exercises' ? 'text-lime-400' : 'text-zinc-500 hover:text-zinc-300'
+              currentTab === 'exercises' ? 'text-pink-400 font-black scale-105' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             <BookOpen className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Ejercicios</span>
+            <span className="text-[9px] font-bold">Ejercicios</span>
           </button>
 
           <button
             onClick={() => setCurrentTab('progress')}
             className={`flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-              currentTab === 'progress' ? 'text-lime-400' : 'text-zinc-500 hover:text-zinc-300'
+              currentTab === 'progress' ? 'text-pink-400 font-black scale-105' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             <TrendingUp className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Progreso</span>
+            <span className="text-[9px] font-bold">Progreso</span>
           </button>
 
           <button
             onClick={() => setCurrentTab('profile')}
             className={`flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-              currentTab === 'profile' ? 'text-lime-400' : 'text-zinc-500 hover:text-zinc-300'
+              currentTab === 'profile' ? 'text-pink-400 font-black scale-105' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             <User className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Perfil</span>
+            <span className="text-[9px] font-bold">Perfil</span>
           </button>
         </div>
       </nav>

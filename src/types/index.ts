@@ -8,7 +8,9 @@ export interface Profile {
   experience_level: string | null;
   primary_goal: string | null;
   unit_system: string;
-  avatar: string | null;
+  avatar: string | null; // Pet icon or avatar identifier e.g. '🐱', '🐼', '🐰', '🐻', '🐸', '🦊', '🐶'
+  xp?: number;
+  streak_weeks?: number;
   onboarding_completed: boolean;
   pin_hash: string | null;
   pin_enabled: boolean;
@@ -49,6 +51,15 @@ export interface Exercise {
   is_conditioning: boolean;
 }
 
+export interface ProgramWeek {
+  id: string;
+  program_id: string;
+  week_number: number; // 1 to 4
+  name?: string; // e.g. "Semana 1: Base", "Semana 2: Progresión", "Semana 3: Pico de Fuerza", "Semana 4: Deload"
+  focus?: string;
+  days?: ProgramDay[];
+}
+
 export interface Program {
   id: string;
   profile_id: string;
@@ -58,11 +69,14 @@ export interface Program {
   active: boolean;
   created_at: string;
   updated_at: string;
+  weeks?: ProgramWeek[];
 }
 
 export interface ProgramDay {
   id: string;
   program_id: string;
+  program_week_id?: string;
+  week_number?: number;
   day_number: number;
   name: string;
   description?: string;
@@ -81,6 +95,7 @@ export interface ProgramExercise {
   rest_seconds?: number;
   notes?: string;
   exercise?: Exercise;
+  is_favorite?: boolean;
 }
 
 export interface WorkoutSession {
@@ -148,4 +163,13 @@ export interface ProfilePreferences {
   lower_body_increment: number;
   default_rest_seconds: number;
   updated_at: string;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  unlocked: boolean;
+  unlockedAt?: string;
 }

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { Program, ProgramDay, ProgramExercise, WorkoutSession, WorkoutExercise, WorkoutSet, PersonalRecord, BodyWeightEntry, ProfilePreferences } from '../types';
+import { Program, ProgramWeek, ProgramDay, ProgramExercise, WorkoutSession, PersonalRecord, BodyWeightEntry, ProfilePreferences } from '../types';
 import { SyncService } from '../services/SyncService';
 
 export class ProgramRepository {
@@ -26,58 +26,99 @@ export class ProgramRepository {
     return null;
   }
 
-  static async saveProgram(program: Program, days: (ProgramDay & { exercises: ProgramExercise[] })[]): Promise<void> {
+  static async saveProgram(
+    program: Program,
+    weeks: (ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[]
+  ): Promise<void> {
     const local = localStorage.getItem(this.LOCAL_PROGRAMS_KEY + program.profile_id);
     let programs: Program[] = local ? JSON.parse(local) : [];
     programs = programs.filter(p => p.id !== program.id);
-    programs.push(program);
+    const fullProgram = { ...program, weeks };
+    programs.push(fullProgram);
     localStorage.setItem(this.LOCAL_PROGRAMS_KEY + program.profile_id, JSON.stringify(programs));
-    localStorage.setItem(`cachitas_program_days_${program.id}`, JSON.stringify(days));
+    localStorage.setItem(`cachitas_program_weeks_${program.id}`, JSON.stringify(weeks));
 
     try {
       await supabase.from('programs').upsert(program);
-      for (const day of days) {
-        const { exercises, ...dayData } = day;
-        await supabase.from('program_days').upsert(dayData);
-        if (exercises && exercises.length > 0) {
-          await supabase.from('program_exercises').upsert(exercises);
+      for (const week of weeks) {
+        const { days, ...weekData } = week;
+        await supabase.from('program_weeks').upsert(weekData);
+        if (days && days.length > 0) {
+          for (const day of days) {
+            const { exercises, ...dayData } = day;
+            await supabase.from('program_days').upsert(dayData);
+            if (exercises && exercises.length > 0) {
+              await supabase.from('program_exercises').upsert(exercises);
+            }
+          }
         }
       }
     } catch {
       await SyncService.enqueueOperation({
         table: 'programs',
         action: 'insert',
-        data: { program, days }
+        data: { program, weeks }
       });
     }
   }
 
-  static async getProgramDays(programId: string): Promise<(ProgramDay & { exercises: ProgramExercise[] })[]> {
+  static async getProgramWeeks(programId: string): Promise<(ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[]> {
     try {
-      const { data: days } = await supabase
-        .from('program_days')
+      const { data: weeks } = await supabase
+        .from('program_weeks')
         .select('*')
         .eq('program_id', programId)
-        .order('day_number', { ascending: true });
+        .order('week_number', { ascending: true });
 
-      if (days && days.length > 0) {
-        const result = [];
-        for (const day of days) {
-          const { data: exercises } = await supabase
-            .from('program_exercises')
-            .select('*, exercise:exercise_id(*)')
-            .eq('program_day_id', day.id)
-            .order('exercise_order', { ascending: true });
-          result.push({ ...day, exercises: exercises || [] });
+      if (weeks && weeks.length > 0) {
+        const resultWeeks = [];
+        for (const week of weeks) {
+          const { data: days } = await supabase
+            .from('program_days')
+            .select('*')
+            .eq('program_week_id', week.id)
+            .order('day_number', { ascending: true });
+
+          const daysWithEx = [];
+          if (days) {
+            for (const day of days) {
+              const { data: exercises } = await supabase
+                .from('program_exercises')
+                .select('*, exercise:exercise_id(*)')
+                .eq('program_day_id', day.id)
+                .order('exercise_order', { ascending: true });
+              daysWithEx.push({ ...day, exercises: exercises || [] });
+            }
+          }
+          resultWeeks.push({ ...week, days: daysWithEx });
         }
-        return result;
+        return resultWeeks;
       }
     } catch {}
 
-    const local = localStorage.getItem(`cachitas_program_days_${programId}`);
-    if (local) {
-      try { return JSON.parse(local); } catch {}
+    const localWeeks = localStorage.getItem(`cachitas_program_weeks_${programId}`);
+    if (localWeeks) {
+      try { return JSON.parse(localWeeks); } catch {}
     }
+
+    // Fallback for legacy 1-week programs
+    const legacyDays = localStorage.getItem(`cachitas_program_days_${programId}`);
+    if (legacyDays) {
+      try {
+        const parsedDays = JSON.parse(legacyDays);
+        return [
+          {
+            id: `pw-1-${programId}`,
+            program_id: programId,
+            week_number: 1,
+            name: 'Semana 1: Base',
+            focus: 'RPE 7-8',
+            days: parsedDays
+          }
+        ];
+      } catch {}
+    }
+
     return [];
   }
 }
