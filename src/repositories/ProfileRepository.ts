@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
+import { isUuid, isDummyLocalUuid, getSlotDefaultUuid } from '../utils/uuid';
 
 async function withTimeout<T>(promise: PromiseLike<T>, ms = 500): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
@@ -15,13 +16,28 @@ export class ProfileRepository {
     const data = localStorage.getItem(this.LOCAL_PROFILES_KEY);
     if (data) {
       try {
-        return JSON.parse(data);
+        const parsed: Profile[] = JSON.parse(data);
+        let migrated = false;
+        const profiles = parsed.map(p => {
+          if (!isUuid(p.id) || p.id.startsWith('local-profile-slot-')) {
+            migrated = true;
+            return {
+              ...p,
+              id: getSlotDefaultUuid(p.slot)
+            };
+          }
+          return p;
+        });
+        if (migrated) {
+          this.saveLocalProfiles(profiles);
+        }
+        return profiles;
       } catch (e) {
         // invalid JSON
       }
     }
     const defaultProfiles: Profile[] = [1, 2, 3, 4].map(slot => ({
-      id: `local-profile-slot-${slot}`,
+      id: getSlotDefaultUuid(slot),
       slot,
       name: null,
       age: null,
@@ -67,12 +83,20 @@ export class ProfileRepository {
 
   static async getProfileById(id: string): Promise<Profile | null> {
     const profiles = await this.getAllProfiles();
-    return profiles.find(p => p.id === id) || null;
+    let profile = profiles.find(p => p.id === id);
+    if (!profile) {
+      const slotMatch = id.match(/slot-(\d+)/) || id.match(/00000000-0000-0000-0000-00000000000(\d)/);
+      if (slotMatch) {
+        const slotNum = parseInt(slotMatch[1], 10);
+        profile = profiles.find(p => p.slot === slotNum);
+      }
+    }
+    return profile || null;
   }
 
   static async updateProfile(profile: Partial<Profile> & { id: string }): Promise<Profile> {
     const profiles = this.getLocalProfiles();
-    const index = profiles.findIndex(p => p.id === profile.id || p.slot === profile.slot);
+    const index = profiles.findIndex(p => p.id === profile.id || (profile.slot && p.slot === profile.slot));
 
     let updatedProfile: Profile;
     if (index !== -1) {
@@ -85,15 +109,25 @@ export class ProfileRepository {
     this.saveLocalProfiles(profiles);
 
     try {
-      const res: any = await withTimeout(
-        supabase
-          .from('profiles')
-          .update({ ...profile, updated_at: new Date().toISOString() })
-          .eq('id', profile.id)
-          .select()
-          .single()
-      );
-      if (res.data) return res.data;
+      let query = supabase.from('profiles').update({ ...profile, updated_at: new Date().toISOString() });
+
+      if (isUuid(profile.id) && !isDummyLocalUuid(profile.id)) {
+        query = query.eq('id', profile.id);
+      } else if (profile.slot) {
+        query = query.eq('slot', profile.slot);
+      } else {
+        return updatedProfile;
+      }
+
+      const res: any = await withTimeout(query.select().single());
+      if (res.data) {
+        const idx = profiles.findIndex(p => p.slot === res.data.slot);
+        if (idx !== -1) {
+          profiles[idx] = res.data;
+          this.saveLocalProfiles(profiles);
+        }
+        return res.data;
+      }
     } catch {
       // offline fallback
     }
