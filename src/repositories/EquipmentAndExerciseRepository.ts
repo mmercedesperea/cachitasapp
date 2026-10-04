@@ -471,7 +471,9 @@ export class EquipmentRepository {
     localStorage.setItem(this.LOCAL_EQ_KEY + profileId, JSON.stringify(slugs));
     if (isUuid(profileId)) {
       try {
-        await withTimeout(supabase.from('profile_equipment').delete().eq('profile_id', profileId));
+        const delRes: any = await withTimeout(supabase.from('profile_equipment').delete().eq('profile_id', profileId));
+        if (delRes.error) throw delRes.error;
+
         const allEq = await this.getAllEquipment();
         const rows = slugs
           .map(slug => allEq.find(e => e.slug === slug))
@@ -482,7 +484,8 @@ export class EquipmentRepository {
           }));
 
         if (rows.length > 0) {
-          await withTimeout(supabase.from('profile_equipment').insert(rows));
+          const insRes: any = await withTimeout(supabase.from('profile_equipment').insert(rows));
+          if (insRes.error) throw insRes.error;
         }
       } catch {
         // offline fallback
@@ -539,9 +542,11 @@ export class ExerciseRepository {
     if (isUuid(profileId)) {
       try {
         if (exists) {
-          await withTimeout(supabase.from('profile_favorite_exercises').delete().match({ profile_id: profileId, exercise_id: exerciseId }));
+          const delRes: any = await withTimeout(supabase.from('profile_favorite_exercises').delete().match({ profile_id: profileId, exercise_id: exerciseId }));
+          if (delRes.error) throw delRes.error;
         } else {
-          await withTimeout(supabase.from('profile_favorite_exercises').insert({ profile_id: profileId, exercise_id: exerciseId }));
+          const insRes: any = await withTimeout(supabase.from('profile_favorite_exercises').insert({ profile_id: profileId, exercise_id: exerciseId }));
+          if (insRes.error) throw insRes.error;
         }
       } catch {}
     }
