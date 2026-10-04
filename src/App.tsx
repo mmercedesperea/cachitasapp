@@ -25,8 +25,17 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'plan' | 'workout' | 'exercises' | 'progress' | 'profile'>('dashboard');
   const [onboardingProfile, setOnboardingProfile] = useState<Profile | null>(null);
   const [activeWorkoutProgramDayId, setActiveWorkoutProgramDayId] = useState<string | undefined>(undefined);
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
+    const initApp = async () => {
+      if (activeProfileId) {
+        await refreshActiveProfile();
+      }
+      setInitializing(false);
+    };
+    initApp();
+
     const handleOnline = () => setOfflineStatus(false);
     const handleOffline = () => setOfflineStatus(true);
     window.addEventListener('online', handleOnline);
@@ -56,6 +65,14 @@ export const App: React.FC = () => {
     setActiveWorkoutProgramDayId(programDayId);
     setCurrentTab('workout');
   };
+
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-lime-400"></div>
+      </div>
+    );
+  }
 
   if (onboardingProfile) {
     return <OnboardingWizard profile={onboardingProfile} onComplete={handleOnboardingComplete} />;

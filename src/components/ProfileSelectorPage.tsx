@@ -29,16 +29,17 @@ export const ProfileSelectorPage: React.FC<{ onSelectProfile: (profile: Profile)
   const loadProfiles = async () => {
     setLoading(true);
     const profiles = await ProfileRepository.getAllProfiles();
-    const cardData: ProfileCardInfo[] = [];
 
-    for (const p of profiles) {
-      const sessions = await WorkoutRepository.getSessionsForProfile(p.id);
-      const completedSessions = sessions.filter(s => s.status === 'completed');
-      cardData.push({
-        profile: p,
-        workoutCount: completedSessions.length
-      });
-    }
+    const cardData: ProfileCardInfo[] = await Promise.all(
+      profiles.map(async p => {
+        const sessions = await WorkoutRepository.getSessionsForProfile(p.id);
+        const completedSessions = sessions.filter(s => s.status === 'completed');
+        return {
+          profile: p,
+          workoutCount: completedSessions.length
+        };
+      })
+    );
 
     setCards(cardData);
     setLoading(false);

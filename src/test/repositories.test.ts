@@ -82,6 +82,20 @@ describe('Repositories and UUID handling', () => {
     expect(reset.onboarding_completed).toBe(false);
   });
 
+  it('ProfileRepository preserves locally configured profiles during offline fallback or reload', async () => {
+    const profiles = await ProfileRepository.getAllProfiles();
+    await ProfileRepository.updateProfile({
+      id: profiles[0].id,
+      slot: 1,
+      name: 'Maria',
+      onboarding_completed: true
+    });
+
+    const reloadedProfiles = await ProfileRepository.getAllProfiles();
+    expect(reloadedProfiles[0].name).toBe('Maria');
+    expect(reloadedProfiles[0].onboarding_completed).toBe(true);
+  });
+
   it('EquipmentRepository persists equipment selection per profile and accepts legacy IDs', async () => {
     const profileId = 'local-profile-slot-1';
     await EquipmentRepository.setProfileEquipmentSlugs(profileId, ['rack', 'barra-olimpica', 'discos']);
