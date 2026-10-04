@@ -60,13 +60,12 @@ export const OnboardingWizard: React.FC<OnboardingProps> = ({ profile, onComplet
       onboarding_completed: true,
     });
 
-    await EquipmentRepository.setProfileEquipmentSlugs(profile.id, selectedEquipmentSlugs);
-
-    for (const exId of favoriteExerciseIds) {
-      await ExerciseRepository.toggleFavoriteExercise(profile.id, exId);
-    }
-
-    await PreferencesRepository.savePreferences({
+    // Fire secondary persistence / background syncs without blocking UI transition
+    EquipmentRepository.setProfileEquipmentSlugs(profile.id, selectedEquipmentSlugs);
+    Promise.all(
+      favoriteExerciseIds.map(exId => ExerciseRepository.toggleFavoriteExercise(profile.id, exId))
+    );
+    PreferencesRepository.savePreferences({
       profile_id: profile.id,
       training_days: [1, 2, 4, 5],
       session_duration: 60,

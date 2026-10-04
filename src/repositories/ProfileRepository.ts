@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 import { Profile } from '../types';
 import { isUuid, isDummyLocalUuid, getSlotDefaultUuid } from '../utils/uuid';
 
-async function withTimeout<T>(promise: PromiseLike<T>, ms = 1000): Promise<T> {
+async function withTimeout<T>(promise: PromiseLike<T>, ms = 2000): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('Network timeout')), ms)
   );
@@ -63,16 +63,80 @@ export class ProfileRepository {
     localStorage.setItem(this.LOCAL_PROFILES_KEY, JSON.stringify(profiles));
   }
 
-  static async getAllProfiles(): Promise<Profile[]> {
+  private static async syncProfileToRemote(profile: Profile): Promise<void> {
     try {
-      const res: any = await withTimeout(supabase.from('profiles').select('*').order('slot', { ascending: true }));
-      if (res.error || !res.data || res.data.length === 0) {
-        return this.getLocalProfiles();
-      }
-      this.saveLocalProfiles(res.data);
-      return res.data;
+      await withTimeout(
+        supabase.from('profiles').upsert(profile, { onConflict: 'slot' })
+      );
     } catch {
-      return this.getLocalProfiles();
+      // Ignore offline sync errors
+    }
+  }
+
+  static async getAllProfiles(): Promise<Profile[]> {
+    const localProfiles = this.getLocalProfiles();
+    try {
+      const res: any = await withTimeout(
+        supabase.from('profiles').select('*').order('slot', { ascending: true })
+      );
+      if (res.error || !res.data || res.data.length === 0) {
+        return localProfiles;
+      }
+
+      const remoteProfiles: Profile[] = res.data;
+      const mergedProfiles: Profile[] = [1, 2, 3, 4].map(slot => {
+        const local = localProfiles.find(p => p.slot === slot);
+        const remote = remoteProfiles.find(p => p.slot === slot);
+
+        if (!remote) {
+          if (local) {
+            if (local.onboarding_completed) {
+              this.syncProfileToRemote(local);
+            }
+            return local;
+          }
+          return {
+            id: getSlotDefaultUuid(slot),
+            slot,
+            name: null,
+            age: null,
+            height_cm: null,
+            weight_kg: null,
+            experience_level: null,
+            primary_goal: null,
+            unit_system: 'metric',
+            avatar: null,
+            onboarding_completed: false,
+            pin_hash: null,
+            pin_enabled: false,
+            pin_attempts: 0,
+            pin_locked_until: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        }
+
+        if (local && local.onboarding_completed && !remote.onboarding_completed) {
+          this.syncProfileToRemote(local);
+          return local;
+        }
+
+        if (local && local.updated_at && remote.updated_at) {
+          const localTime = new Date(local.updated_at).getTime();
+          const remoteTime = new Date(remote.updated_at).getTime();
+          if (localTime > remoteTime && local.onboarding_completed) {
+            this.syncProfileToRemote(local);
+            return local;
+          }
+        }
+
+        return remote;
+      });
+
+      this.saveLocalProfiles(mergedProfiles);
+      return mergedProfiles;
+    } catch {
+      return localProfiles;
     }
   }
 
@@ -109,17 +173,14 @@ export class ProfileRepository {
     this.saveLocalProfiles(profiles);
 
     try {
-      let query = supabase.from('profiles').update({ ...profile, updated_at: new Date().toISOString() });
+      const res: any = await withTimeout(
+        supabase
+          .from('profiles')
+          .upsert(updatedProfile, { onConflict: 'slot' })
+          .select()
+          .single()
+      );
 
-      if (isUuid(profile.id) && !isDummyLocalUuid(profile.id)) {
-        query = query.eq('id', profile.id);
-      } else if (profile.slot) {
-        query = query.eq('slot', profile.slot);
-      } else {
-        return updatedProfile;
-      }
-
-      const res: any = await withTimeout(query.select().single());
       if (res.data) {
         const idx = profiles.findIndex(p => p.slot === res.data.slot);
         if (idx !== -1) {

@@ -3,6 +3,13 @@ import { Program, ProgramWeek, ProgramDay, ProgramExercise, WorkoutSession, Work
 import { SyncService } from '../services/SyncService';
 import { isUuid, isDummyLocalUuid } from '../utils/uuid';
 
+async function withTimeout<T>(promise: PromiseLike<T>, ms = 2000): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Network timeout')), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
 export class ProgramRepository {
   private static LOCAL_PROGRAMS_KEY = 'cachitas_programs_';
 
@@ -11,13 +18,15 @@ export class ProgramRepository {
 
     if (isUuid(profileId)) {
       try {
-        const { data } = await supabase
-          .from('programs')
-          .select('*')
-          .eq('profile_id', profileId)
-          .eq('active', true)
-          .single();
-        if (data) program = data;
+        const res: any = await withTimeout(
+          supabase
+            .from('programs')
+            .select('*')
+            .eq('profile_id', profileId)
+            .eq('active', true)
+            .single()
+        );
+        if (res.data) program = res.data;
       } catch {}
     }
 
@@ -226,12 +235,14 @@ export class WorkoutRepository {
   static async getSessionsForProfile(profileId: string): Promise<WorkoutSession[]> {
     if (isUuid(profileId)) {
       try {
-        const { data } = await supabase
-          .from('workout_sessions')
-          .select('*, exercises:workout_exercises(*, exercise:exercise_id(*), sets:workout_sets(*))')
-          .eq('profile_id', profileId)
-          .order('created_at', { ascending: false });
-        if (data) return data;
+        const res: any = await withTimeout(
+          supabase
+            .from('workout_sessions')
+            .select('*, exercises:workout_exercises(*, exercise:exercise_id(*), sets:workout_sets(*))')
+            .eq('profile_id', profileId)
+            .order('created_at', { ascending: false })
+        );
+        if (res.data) return res.data;
       } catch {}
     }
 
@@ -393,12 +404,14 @@ export class PreferencesRepository {
 
     if (isUuid(profileId)) {
       try {
-        const { data } = await supabase
-          .from('profile_preferences')
-          .select('*')
-          .eq('profile_id', profileId)
-          .single();
-        if (data) return data;
+        const res: any = await withTimeout(
+          supabase
+            .from('profile_preferences')
+            .select('*')
+            .eq('profile_id', profileId)
+            .single()
+        );
+        if (res.data) return res.data;
       } catch {}
     }
 

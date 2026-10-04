@@ -49,9 +49,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     fetch: (...args) => {
       const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), 1000); // 1s timeout for network call
+      const id = setTimeout(() => controller.abort(), 2500); // 2.5s timeout for mobile network resilience
       const options = args[1] || {};
-      return fetch(args[0], { ...options, signal: controller.signal })
+      return fetch(args[0], { ...options, signal: options.signal || controller.signal })
         .finally(() => clearTimeout(id));
     }
   }

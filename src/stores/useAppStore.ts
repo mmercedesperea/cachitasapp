@@ -28,20 +28,30 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveProfileId: async (id: string | null) => {
     if (id) {
-      const profile = await ProfileRepository.getProfileById(id);
-      const targetId = profile ? profile.id : id;
+      const localProfiles = ProfileRepository.getLocalProfiles();
+      const localProfile = localProfiles.find(p => p.id === id || (p.slot && id.includes(`slot-${p.slot}`)));
+      const targetId = localProfile ? localProfile.id : id;
       localStorage.setItem('cachitas_active_profile_id', targetId);
-
-      const session = await WorkoutRepository.getActiveSession(targetId);
-      const prefs = await PreferencesRepository.getPreferences(targetId);
-      const program = await ProgramRepository.getActiveProgramForProfile(targetId);
 
       set({
         activeProfileId: targetId,
-        activeProfile: profile,
-        activeSession: session,
-        preferences: prefs,
-        activeProgram: program,
+        activeProfile: localProfile || null,
+      });
+
+      ProfileRepository.getProfileById(targetId).then(profile => {
+        if (profile) set({ activeProfile: profile });
+      });
+
+      Promise.all([
+        WorkoutRepository.getActiveSession(targetId),
+        PreferencesRepository.getPreferences(targetId),
+        ProgramRepository.getActiveProgramForProfile(targetId)
+      ]).then(([session, prefs, program]) => {
+        set({
+          activeSession: session,
+          preferences: prefs,
+          activeProgram: program,
+        });
       });
     } else {
       localStorage.removeItem('cachitas_active_profile_id');
@@ -58,14 +68,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshActiveProfile: async () => {
     const id = get().activeProfileId;
     if (id) {
+      const localProfiles = ProfileRepository.getLocalProfiles();
+      const localProfile = localProfiles.find(p => p.id === id || (p.slot && id.includes(`slot-${p.slot}`)));
+      if (localProfile) {
+        set({ activeProfile: localProfile });
+      }
+
       const profile = await ProfileRepository.getProfileById(id);
       const targetId = profile ? profile.id : id;
       if (targetId !== id) {
         localStorage.setItem('cachitas_active_profile_id', targetId);
       }
-      const prefs = await PreferencesRepository.getPreferences(targetId);
-      const program = await ProgramRepository.getActiveProgramForProfile(targetId);
-      set({ activeProfileId: targetId, activeProfile: profile, preferences: prefs, activeProgram: program });
+      const [prefs, program] = await Promise.all([
+        PreferencesRepository.getPreferences(targetId),
+        ProgramRepository.getActiveProgramForProfile(targetId)
+      ]);
+      set({ activeProfileId: targetId, activeProfile: profile || localProfile || null, preferences: prefs, activeProgram: program });
     }
   },
 
