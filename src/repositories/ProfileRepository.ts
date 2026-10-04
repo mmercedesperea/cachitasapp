@@ -12,7 +12,7 @@ async function withTimeout<T>(promise: PromiseLike<T>, ms = 2000): Promise<T> {
 export class ProfileRepository {
   private static LOCAL_PROFILES_KEY = 'cachitas_local_profiles';
 
-  private static getLocalProfiles(): Profile[] {
+  public static getLocalProfiles(): Profile[] {
     const data = localStorage.getItem(this.LOCAL_PROFILES_KEY);
     if (data) {
       try {
