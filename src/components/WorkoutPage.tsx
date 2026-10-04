@@ -8,6 +8,7 @@ import { ProgressionService } from '../services/ProgressionService';
 import { PersonalRecordService } from '../services/PersonalRecordService';
 import { PlateCalculatorService, PlateBreakdown } from '../services/PlateCalculatorService';
 import { PET_AVATARS, CATEGORY_COLORS, getRandomMotivationalMessage } from '../utils/kawaii';
+import { generateUuid } from '../utils/uuid';
 
 interface WorkoutPageProps {
   profile: Profile;
@@ -92,7 +93,7 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
         }));
       }
 
-      const sessionId = `session-${profile.id}-${Date.now()}`;
+      const sessionId = generateUuid();
       const newSession: WorkoutSession = {
         id: sessionId,
         profile_id: profile.id,
@@ -102,7 +103,7 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
         total_volume: 0,
         created_at: new Date().toISOString(),
         exercises: exercisesToLoad.map((item, idx) => {
-          const weId = `we-${sessionId}-${idx}`;
+          const weId = generateUuid();
           const defaultWeight = item.exercise.category === 'Squat' ? 80 : item.exercise.category === 'Bench' ? 60 : 100;
 
           return {
@@ -112,7 +113,7 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
             exercise_order: idx + 1,
             exercise: item.exercise,
             sets: Array.from({ length: item.targetSets }).map((_, setIdx) => ({
-              id: `ws-${weId}-${setIdx + 1}`,
+              id: generateUuid(),
               workout_exercise_id: weId,
               set_number: setIdx + 1,
               target_weight: defaultWeight,
@@ -185,7 +186,7 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
         setNewPRCelebration(prResult.message);
         setNewPRCount(prev => prev + 1);
         const newPR: PersonalRecord = {
-          id: `pr-${profile.id}-${Date.now()}`,
+          id: generateUuid(),
           profile_id: profile.id,
           exercise_id: exerciseId,
           record_type: 'e1RM',

@@ -65,9 +65,10 @@ export class ProfileRepository {
 
   private static async syncProfileToRemote(profile: Profile): Promise<void> {
     try {
-      await withTimeout(
+      const res: any = await withTimeout(
         supabase.from('profiles').upsert(profile, { onConflict: 'slot' })
       );
+      if (res.error) throw res.error;
     } catch {
       // Ignore offline sync errors
     }
@@ -180,6 +181,8 @@ export class ProfileRepository {
           .select()
           .single()
       );
+
+      if (res.error) throw res.error;
 
       if (res.data) {
         const idx = profiles.findIndex(p => p.slot === res.data.slot);

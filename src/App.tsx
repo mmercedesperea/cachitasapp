@@ -9,6 +9,7 @@ import { ExercisesCatalog } from './components/ExercisesCatalog';
 import { WorkoutPage } from './components/WorkoutPage';
 import { ProgressPage } from './components/ProgressPage';
 import { ProfileSettingsPage } from './components/ProfileSettingsPage';
+import { SyncService } from './services/SyncService';
 import { Profile } from './types';
 
 export const App: React.FC = () => {
@@ -32,11 +33,15 @@ export const App: React.FC = () => {
       if (activeProfileId) {
         await refreshActiveProfile();
       }
+      SyncService.processQueue().catch(() => {});
       setInitializing(false);
     };
     initApp();
 
-    const handleOnline = () => setOfflineStatus(false);
+    const handleOnline = () => {
+      setOfflineStatus(false);
+      SyncService.processQueue().catch(() => {});
+    };
     const handleOffline = () => setOfflineStatus(true);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);

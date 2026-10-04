@@ -1,7 +1,12 @@
 import { supabase } from '../lib/supabase';
 import { Program, ProgramWeek, ProgramDay, ProgramExercise, WorkoutSession, WorkoutExercise, WorkoutSet, PersonalRecord, BodyWeightEntry, ProfilePreferences } from '../types';
 import { SyncService } from '../services/SyncService';
-import { isUuid, isDummyLocalUuid } from '../utils/uuid';
+import { isUuid, isDummyLocalUuid, generateUuid } from '../utils/uuid';
+
+function ensureValidUuid(id: string | null | undefined): string {
+  if (id && isUuid(id)) return id;
+  return generateUuid();
+}
 
 async function withTimeout<T>(promise: PromiseLike<T>, ms = 2000): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
@@ -26,7 +31,7 @@ export class ProgramRepository {
             .eq('active', true)
             .single()
         );
-        if (res.data) program = res.data;
+        if (res.data && !res.error) program = res.data;
       } catch {}
     }
 
@@ -66,7 +71,7 @@ export class ProgramRepository {
       const days = weeksOrDays as (ProgramDay & { exercises: ProgramExercise[] })[];
       structuredWeeks = [
         {
-          id: `week-1-${program.id}`,
+          id: generateUuid(),
           program_id: program.id,
           week_number: 1,
           name: 'Semana 1',
@@ -91,7 +96,7 @@ export class ProgramRepository {
 
     if (isUuid(program.profile_id)) {
       try {
-        await supabase.from('programs').upsert({
+        const resProg: any = await supabase.from('programs').upsert({
           id: program.id,
           profile_id: program.profile_id,
           name: program.name,
@@ -101,10 +106,12 @@ export class ProgramRepository {
           created_at: program.created_at,
           updated_at: program.updated_at
         });
+        if (resProg.error) throw resProg.error;
 
         const weekRows = structuredWeeks.map(({ days, ...w }) => w);
         if (weekRows.length > 0) {
-          await supabase.from('program_weeks').upsert(weekRows);
+          const resWeeks: any = await supabase.from('program_weeks').upsert(weekRows);
+          if (resWeeks.error) throw resWeeks.error;
         }
 
         const dayRows = structuredWeeks.flatMap(w =>
@@ -115,7 +122,8 @@ export class ProgramRepository {
           }))
         );
         if (dayRows.length > 0) {
-          await supabase.from('program_days').upsert(dayRows);
+          const resDays: any = await supabase.from('program_days').upsert(dayRows);
+          if (resDays.error) throw resDays.error;
         }
 
         const exerciseRows = structuredWeeks.flatMap(w =>
@@ -124,7 +132,8 @@ export class ProgramRepository {
           )
         );
         if (exerciseRows.length > 0) {
-          await supabase.from('program_exercises').upsert(exerciseRows);
+          const resEx: any = await supabase.from('program_exercises').upsert(exerciseRows);
+          if (resEx.error) throw resEx.error;
         }
       } catch {
         await SyncService.enqueueOperation({
@@ -139,23 +148,23 @@ export class ProgramRepository {
   static async getProgramWeeks(programId: string): Promise<(ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[]> {
     if (isUuid(programId)) {
       try {
-        const { data: weeks } = await supabase
+        const { data: weeks, error: weekErr } = await supabase
           .from('program_weeks')
           .select('*')
           .eq('program_id', programId)
           .order('week_number', { ascending: true });
 
-        if (weeks && weeks.length > 0) {
+        if (!weekErr && weeks && weeks.length > 0) {
           const result = [];
           for (const week of weeks) {
-            const { data: days } = await supabase
+            const { data: days, error: dayErr } = await supabase
               .from('program_days')
               .select('*')
               .eq('program_week_id', week.id)
               .order('day_number', { ascending: true });
 
             const daysWithExercises = [];
-            if (days && days.length > 0) {
+            if (!dayErr && days && days.length > 0) {
               for (const day of days) {
                 const { data: exercises } = await supabase
                   .from('program_exercises')
@@ -184,7 +193,7 @@ export class ProgramRepository {
     if (legacyDays.length > 0) {
       return [
         {
-          id: `week-1-${programId}`,
+          id: generateUuid(),
           program_id: programId,
           week_number: 1,
           name: 'Semana 1',
@@ -200,13 +209,13 @@ export class ProgramRepository {
   static async getProgramDays(programId: string): Promise<(ProgramDay & { exercises: ProgramExercise[] })[]> {
     if (isUuid(programId)) {
       try {
-        const { data: days } = await supabase
+        const { data: days, error: dayErr } = await supabase
           .from('program_days')
           .select('*')
           .eq('program_id', programId)
           .order('day_number', { ascending: true });
 
-        if (days && days.length > 0) {
+        if (!dayErr && days && days.length > 0) {
           const result = [];
           for (const day of days) {
             const { data: exercises } = await supabase
@@ -242,7 +251,7 @@ export class WorkoutRepository {
             .eq('profile_id', profileId)
             .order('created_at', { ascending: false })
         );
-        if (res.data) return res.data;
+        if (res.data && !res.error) return res.data;
       } catch {}
     }
 
@@ -266,14 +275,19 @@ export class WorkoutRepository {
     if (isUuid(session.profile_id)) {
       try {
         const { exercises, ...sessionData } = session;
-        await supabase.from('workout_sessions').upsert(sessionData);
+        const resSess: any = await supabase.from('workout_sessions').upsert(sessionData);
+        if (resSess.error) throw resSess.error;
+
         if (exercises) {
           for (const ex of exercises) {
             const { sets, exercise, ...exData } = ex;
-            await supabase.from('workout_exercises').upsert(exData);
+            const resEx: any = await supabase.from('workout_exercises').upsert(exData);
+            if (resEx.error) throw resEx.error;
+
             if (sets) {
               for (const st of sets) {
-                await supabase.from('workout_sets').upsert(st);
+                const resSt: any = await supabase.from('workout_sets').upsert(st);
+                if (resSt.error) throw resSt.error;
               }
             }
           }
@@ -300,11 +314,11 @@ export class PersonalRecordRepository {
   static async getPRsForProfile(profileId: string): Promise<PersonalRecord[]> {
     if (isUuid(profileId)) {
       try {
-        const { data } = await supabase
+        const res: any = await supabase
           .from('personal_records')
           .select('*, exercise:exercise_id(*)')
           .eq('profile_id', profileId);
-        if (data) return data;
+        if (res.data && !res.error) return res.data;
       } catch {}
     }
 
@@ -328,7 +342,8 @@ export class PersonalRecordRepository {
     if (isUuid(pr.profile_id)) {
       try {
         const { exercise, ...prData } = pr;
-        await supabase.from('personal_records').upsert(prData);
+        const resPr: any = await supabase.from('personal_records').upsert(prData);
+        if (resPr.error) throw resPr.error;
       } catch {
         await SyncService.enqueueOperation({
           table: 'personal_records',
@@ -346,12 +361,12 @@ export class BodyWeightRepository {
   static async getEntriesForProfile(profileId: string): Promise<BodyWeightEntry[]> {
     if (isUuid(profileId)) {
       try {
-        const { data } = await supabase
+        const res: any = await supabase
           .from('body_weight_entries')
           .select('*')
           .eq('profile_id', profileId)
           .order('recorded_at', { ascending: true });
-        if (data) return data;
+        if (res.data && !res.error) return res.data;
       } catch {}
     }
 
@@ -364,7 +379,7 @@ export class BodyWeightRepository {
 
   static async addEntry(profileId: string, weightKg: number): Promise<BodyWeightEntry> {
     const entry: BodyWeightEntry = {
-      id: 'bw-' + Date.now(),
+      id: generateUuid(),
       profile_id: profileId,
       weight_kg: weightKg,
       recorded_at: new Date().toISOString()
@@ -375,7 +390,8 @@ export class BodyWeightRepository {
 
     if (isUuid(profileId)) {
       try {
-        await supabase.from('body_weight_entries').insert(entry);
+        const resBw: any = await supabase.from('body_weight_entries').insert(entry);
+        if (resBw.error) throw resBw.error;
       } catch {
         await SyncService.enqueueOperation({
           table: 'body_weight_entries',
@@ -411,7 +427,7 @@ export class PreferencesRepository {
             .eq('profile_id', profileId)
             .single()
         );
-        if (res.data) return res.data;
+        if (res.data && !res.error) return res.data;
       } catch {}
     }
 
@@ -426,7 +442,8 @@ export class PreferencesRepository {
     localStorage.setItem(this.LOCAL_PREFS_KEY + prefs.profile_id, JSON.stringify(prefs));
     if (isUuid(prefs.profile_id)) {
       try {
-        await supabase.from('profile_preferences').upsert(prefs);
+        const resPrefs: any = await supabase.from('profile_preferences').upsert(prefs);
+        if (resPrefs.error) throw resPrefs.error;
       } catch {}
     }
   }

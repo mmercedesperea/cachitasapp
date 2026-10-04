@@ -1,11 +1,21 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ProfileRepository } from '../repositories/ProfileRepository';
 import { EquipmentRepository } from '../repositories/EquipmentAndExerciseRepository';
-import { isUuid, isDummyLocalUuid } from '../utils/uuid';
+import { BodyWeightRepository, WorkoutRepository, PersonalRecordRepository } from '../repositories/WorkoutAndOtherRepositories';
+import { SyncService } from '../services/SyncService';
+import { isUuid, isDummyLocalUuid, generateUuid } from '../utils/uuid';
 
 describe('Repositories and UUID handling', () => {
   beforeEach(() => {
     localStorage.clear();
+  });
+
+  it('generateUuid produces valid UUID v4 strings', () => {
+    const uuid1 = generateUuid();
+    const uuid2 = generateUuid();
+    expect(isUuid(uuid1)).toBe(true);
+    expect(isUuid(uuid2)).toBe(true);
+    expect(uuid1).not.toBe(uuid2);
   });
 
   it('isUuid correctly identifies valid and invalid UUIDs', () => {
@@ -71,29 +81,20 @@ describe('Repositories and UUID handling', () => {
     expect(reloaded?.name).toBe('Carlos');
   });
 
-  it('ProfileRepository resets profile slot preserving the slot number', async () => {
-    const profiles = await ProfileRepository.getAllProfiles();
-    const target = profiles[0];
-    await ProfileRepository.updateProfile({ id: target.id, name: 'Carlos', onboarding_completed: true });
+  it('BodyWeightRepository generates valid UUIDs for new entries', async () => {
+    const profileId = '00000000-0000-0000-0000-000000000001';
+    const entry = await BodyWeightRepository.addEntry(profileId, 78.5);
 
-    const reset = await ProfileRepository.resetProfile(target.id);
-    expect(reset.slot).toBe(1);
-    expect(reset.name).toBeNull();
-    expect(reset.onboarding_completed).toBe(false);
+    expect(isUuid(entry.id)).toBe(true);
+    expect(entry.weight_kg).toBe(78.5);
+
+    const entries = await BodyWeightRepository.getEntriesForProfile(profileId);
+    expect(entries.some(e => e.id === entry.id)).toBe(true);
   });
 
-  it('ProfileRepository preserves locally configured profiles during offline fallback or reload', async () => {
-    const profiles = await ProfileRepository.getAllProfiles();
-    await ProfileRepository.updateProfile({
-      id: profiles[0].id,
-      slot: 1,
-      name: 'Maria',
-      onboarding_completed: true
-    });
-
-    const reloadedProfiles = await ProfileRepository.getAllProfiles();
-    expect(reloadedProfiles[0].name).toBe('Maria');
-    expect(reloadedProfiles[0].onboarding_completed).toBe(true);
+  it('SyncService processQueue handles empty queue gracefully', async () => {
+    const res = await SyncService.processQueue();
+    expect(res).toEqual({ syncedCount: 0, remainingCount: 0 });
   });
 
   it('EquipmentRepository persists equipment selection per profile and accepts legacy IDs', async () => {

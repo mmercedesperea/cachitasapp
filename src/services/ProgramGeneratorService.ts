@@ -1,6 +1,7 @@
 import { Exercise, Program, ProgramWeek, ProgramDay, ProgramExercise } from '../types';
 import { EquipmentRepository, ExerciseRepository } from '../repositories/EquipmentAndExerciseRepository';
 import { ProgramRepository } from '../repositories/WorkoutAndOtherRepositories';
+import { generateUuid } from '../utils/uuid';
 
 export class ProgramGeneratorService {
   /**
@@ -69,7 +70,7 @@ export class ProgramGeneratorService {
       allowedExercises.find(e => e.movement_pattern === 'Cardio') ||
       squatEx.exercise;
 
-    const programId = `program-${profileId}-${Date.now()}`;
+    const programId = generateUuid();
     const newProgram: Program = {
       id: programId,
       profile_id: profileId,
@@ -127,10 +128,9 @@ export class ProgramGeneratorService {
     ];
 
     const weeks: (ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[] = weekConfigs.map(config => {
-      const weekId = `week-${config.weekNum}-${programId}`;
+      const weekId = generateUuid();
 
       const buildExerciseObj = (
-        peId: string,
         dayId: string,
         item: { exercise: Exercise; isFav: boolean },
         order: number,
@@ -139,7 +139,7 @@ export class ProgramGeneratorService {
         rpe: number,
         rest: number
       ): ProgramExercise => ({
-        id: peId,
+        id: generateUuid(),
         program_day_id: dayId,
         exercise_id: item.exercise.id,
         exercise_order: order,
@@ -151,10 +151,10 @@ export class ProgramGeneratorService {
         exercise: item.exercise
       });
 
-      const day1Id = `day-${config.weekNum}-1-${programId}`;
-      const day2Id = `day-${config.weekNum}-2-${programId}`;
-      const day3Id = `day-${config.weekNum}-3-${programId}`;
-      const day4Id = `day-${config.weekNum}-4-${programId}`;
+      const day1Id = generateUuid();
+      const day2Id = generateUuid();
+      const day3Id = generateUuid();
+      const day4Id = generateUuid();
 
       const day1: ProgramDay & { exercises: ProgramExercise[] } = {
         id: day1Id,
@@ -165,11 +165,11 @@ export class ProgramGeneratorService {
         name: 'Día 1 — Squat Day',
         description: 'Fuerza principal de sentadilla y accesorios',
         exercises: [
-          buildExerciseObj(`pe-${config.weekNum}-1-1`, day1Id, squatEx, 1, config.mainSets, config.mainReps, config.rpeMain, 180),
-          buildExerciseObj(`pe-${config.weekNum}-1-2`, day1Id, benchEx, 2, Math.max(3, Math.round(4 * config.accMult)), 6, config.rpeAcc, 120),
-          buildExerciseObj(`pe-${config.weekNum}-1-3`, day1Id, latPullEx, 3, Math.max(3, Math.round(4 * config.accMult)), 10, config.rpeAcc, 90),
-          buildExerciseObj(`pe-${config.weekNum}-1-4`, day1Id, curlEx, 4, Math.max(2, Math.round(3 * config.accMult)), 12, config.rpeAcc, 60),
-          buildExerciseObj(`pe-${config.weekNum}-1-5`, day1Id, { exercise: cardioEx, isFav: favoriteIds.includes(cardioEx.id) }, 5, 1, 10, 6, 60)
+          buildExerciseObj(day1Id, squatEx, 1, config.mainSets, config.mainReps, config.rpeMain, 180),
+          buildExerciseObj(day1Id, benchEx, 2, Math.max(3, Math.round(4 * config.accMult)), 6, config.rpeAcc, 120),
+          buildExerciseObj(day1Id, latPullEx, 3, Math.max(3, Math.round(4 * config.accMult)), 10, config.rpeAcc, 90),
+          buildExerciseObj(day1Id, curlEx, 4, Math.max(2, Math.round(3 * config.accMult)), 12, config.rpeAcc, 60),
+          buildExerciseObj(day1Id, { exercise: cardioEx, isFav: favoriteIds.includes(cardioEx.id) }, 5, 1, 10, 6, 60)
         ]
       };
 
@@ -182,10 +182,10 @@ export class ProgramGeneratorService {
         name: 'Día 2 — Bench Day',
         description: 'Fuerza de press banca y empuje vertical',
         exercises: [
-          buildExerciseObj(`pe-${config.weekNum}-2-1`, day2Id, benchEx, 1, config.mainSets, config.mainReps, config.rpeMain, 180),
-          buildExerciseObj(`pe-${config.weekNum}-2-2`, day2Id, upperEx, 2, Math.max(3, Math.round(4 * config.accMult)), 6, config.rpeAcc, 120),
-          buildExerciseObj(`pe-${config.weekNum}-2-3`, day2Id, rowEx, 3, Math.max(3, Math.round(4 * config.accMult)), 10, config.rpeAcc, 90),
-          buildExerciseObj(`pe-${config.weekNum}-2-4`, day2Id, tricepsEx, 4, Math.max(2, Math.round(3 * config.accMult)), 12, config.rpeAcc, 60)
+          buildExerciseObj(day2Id, benchEx, 1, config.mainSets, config.mainReps, config.rpeMain, 180),
+          buildExerciseObj(day2Id, upperEx, 2, Math.max(3, Math.round(4 * config.accMult)), 6, config.rpeAcc, 120),
+          buildExerciseObj(day2Id, rowEx, 3, Math.max(3, Math.round(4 * config.accMult)), 10, config.rpeAcc, 90),
+          buildExerciseObj(day2Id, tricepsEx, 4, Math.max(2, Math.round(3 * config.accMult)), 12, config.rpeAcc, 60)
         ]
       };
 
@@ -198,10 +198,10 @@ export class ProgramGeneratorService {
         name: 'Día 3 — Deadlift Day',
         description: 'Fuerza de peso muerto y sentadilla secundaria',
         exercises: [
-          buildExerciseObj(`pe-${config.weekNum}-3-1`, day3Id, deadliftEx, 1, config.mainSets, Math.max(3, config.mainReps - 2), config.rpeMain, 180),
-          buildExerciseObj(`pe-${config.weekNum}-3-2`, day3Id, pausedSquatEx, 2, Math.max(2, Math.round(3 * config.accMult)), 6, config.rpeAcc, 120),
-          buildExerciseObj(`pe-${config.weekNum}-3-3`, day3Id, latPullEx, 3, Math.max(3, Math.round(4 * config.accMult)), 10, config.rpeAcc, 90),
-          buildExerciseObj(`pe-${config.weekNum}-3-4`, day3Id, curlEx, 4, Math.max(2, Math.round(3 * config.accMult)), 12, config.rpeAcc, 60)
+          buildExerciseObj(day3Id, deadliftEx, 1, config.mainSets, Math.max(3, config.mainReps - 2), config.rpeMain, 180),
+          buildExerciseObj(day3Id, pausedSquatEx, 2, Math.max(2, Math.round(3 * config.accMult)), 6, config.rpeAcc, 120),
+          buildExerciseObj(day3Id, latPullEx, 3, Math.max(3, Math.round(4 * config.accMult)), 10, config.rpeAcc, 90),
+          buildExerciseObj(day3Id, curlEx, 4, Math.max(2, Math.round(3 * config.accMult)), 12, config.rpeAcc, 60)
         ]
       };
 
@@ -214,10 +214,10 @@ export class ProgramGeneratorService {
         name: 'Día 4 — Strength + Conditioning',
         description: 'Volumen e hipertrofia de accesorios + acondicionamiento',
         exercises: [
-          buildExerciseObj(`pe-${config.weekNum}-4-1`, day4Id, benchEx, 1, Math.max(3, Math.round(4 * config.accMult)), 8, config.rpeAcc, 120),
-          buildExerciseObj(`pe-${config.weekNum}-4-2`, day4Id, squatEx, 2, Math.max(3, Math.round(4 * config.accMult)), 6, config.rpeAcc, 120),
-          buildExerciseObj(`pe-${config.weekNum}-4-3`, day4Id, rdlEx, 3, Math.max(2, Math.round(3 * config.accMult)), 8, config.rpeAcc, 90),
-          buildExerciseObj(`pe-${config.weekNum}-4-4`, day4Id, { exercise: cardioEx, isFav: favoriteIds.includes(cardioEx.id) }, 4, 1, 15, 7, 60)
+          buildExerciseObj(day4Id, benchEx, 1, Math.max(3, Math.round(4 * config.accMult)), 8, config.rpeAcc, 120),
+          buildExerciseObj(day4Id, squatEx, 2, Math.max(3, Math.round(4 * config.accMult)), 6, config.rpeAcc, 120),
+          buildExerciseObj(day4Id, rdlEx, 3, Math.max(2, Math.round(3 * config.accMult)), 8, config.rpeAcc, 90),
+          buildExerciseObj(day4Id, { exercise: cardioEx, isFav: favoriteIds.includes(cardioEx.id) }, 4, 1, 15, 7, 60)
         ]
       };
 
