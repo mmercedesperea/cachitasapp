@@ -9,6 +9,8 @@ export interface Profile {
   primary_goal: string | null;
   unit_system: string;
   avatar: string | null;
+  pet_avatar?: string | null;
+  xp?: number;
   onboarding_completed: boolean;
   pin_hash: string | null;
   pin_enabled: boolean;
@@ -49,20 +51,33 @@ export interface Exercise {
   is_conditioning: boolean;
 }
 
+export interface ProgramWeek {
+  id: string;
+  program_id: string;
+  week_number: number;
+  name?: string;
+  focus?: string;
+  days?: (ProgramDay & { exercises?: ProgramExercise[] })[];
+}
+
 export interface Program {
   id: string;
   profile_id: string;
   name: string;
   goal: string;
   days_per_week: number;
+  total_weeks?: number;
   active: boolean;
   created_at: string;
   updated_at: string;
+  weeks?: ProgramWeek[];
 }
 
 export interface ProgramDay {
   id: string;
   program_id: string;
+  program_week_id?: string;
+  week_number?: number;
   day_number: number;
   name: string;
   description?: string;
@@ -80,6 +95,7 @@ export interface ProgramExercise {
   target_percentage?: number;
   rest_seconds?: number;
   notes?: string;
+  is_favorite?: boolean;
   exercise?: Exercise;
 }
 
@@ -148,4 +164,13 @@ export interface ProfilePreferences {
   lower_body_increment: number;
   default_rest_seconds: number;
   updated_at: string;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  unlocked: boolean;
+  unlocked_at?: string;
 }

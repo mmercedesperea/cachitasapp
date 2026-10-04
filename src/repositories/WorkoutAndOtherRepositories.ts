@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { Program, ProgramDay, ProgramExercise, WorkoutSession, WorkoutExercise, WorkoutSet, PersonalRecord, BodyWeightEntry, ProfilePreferences } from '../types';
+import { Program, ProgramWeek, ProgramDay, ProgramExercise, WorkoutSession, WorkoutExercise, WorkoutSet, PersonalRecord, BodyWeightEntry, ProfilePreferences } from '../types';
 import { SyncService } from '../services/SyncService';
 import { isUuid, isDummyLocalUuid } from '../utils/uuid';
 
@@ -7,6 +7,8 @@ export class ProgramRepository {
   private static LOCAL_PROGRAMS_KEY = 'cachitas_programs_';
 
   static async getActiveProgramForProfile(profileId: string): Promise<Program | null> {
+    let program: Program | null = null;
+
     if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
       try {
         const { data } = await supabase
@@ -15,46 +17,171 @@ export class ProgramRepository {
           .eq('profile_id', profileId)
           .eq('active', true)
           .single();
-        if (data) return data;
+        if (data) program = data;
       } catch {}
     }
 
-    const local = localStorage.getItem(this.LOCAL_PROGRAMS_KEY + profileId);
-    if (local) {
-      try {
-        const programs: Program[] = JSON.parse(local);
-        return programs.find(p => p.active) || null;
-      } catch {}
+    if (!program) {
+      const local = localStorage.getItem(this.LOCAL_PROGRAMS_KEY + profileId);
+      if (local) {
+        try {
+          const programs: Program[] = JSON.parse(local);
+          program = programs.find(p => p.active) || null;
+        } catch {}
+      }
     }
-    return null;
+
+    if (program) {
+      const weeks = await this.getProgramWeeks(program.id);
+      program = { ...program, weeks };
+    }
+
+    return program;
   }
 
-  static async saveProgram(program: Program, days: (ProgramDay & { exercises: ProgramExercise[] })[]): Promise<void> {
+  static async saveProgram(
+    program: Program,
+    weeksOrDays: (ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[] | (ProgramDay & { exercises: ProgramExercise[] })[]
+  ): Promise<void> {
     const local = localStorage.getItem(this.LOCAL_PROGRAMS_KEY + program.profile_id);
     let programs: Program[] = local ? JSON.parse(local) : [];
     programs = programs.filter(p => p.id !== program.id);
-    programs.push(program);
+
+    let structuredWeeks: (ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[] = [];
+
+    // Check if input is weeks array or days array
+    if (weeksOrDays.length > 0 && 'week_number' in weeksOrDays[0] && 'days' in weeksOrDays[0]) {
+      structuredWeeks = weeksOrDays as (ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[];
+    } else {
+      // Legacy single-week/days array: convert to 1 week
+      const days = weeksOrDays as (ProgramDay & { exercises: ProgramExercise[] })[];
+      structuredWeeks = [
+        {
+          id: `week-1-${program.id}`,
+          program_id: program.id,
+          week_number: 1,
+          name: 'Semana 1',
+          focus: 'Base RPE 7-8',
+          days
+        }
+      ];
+    }
+
+    const programToSave: Program = {
+      ...program,
+      weeks: structuredWeeks
+    };
+
+    programs.push(programToSave);
     localStorage.setItem(this.LOCAL_PROGRAMS_KEY + program.profile_id, JSON.stringify(programs));
-    localStorage.setItem(`cachitas_program_days_${program.id}`, JSON.stringify(days));
+    localStorage.setItem(`cachitas_program_weeks_${program.id}`, JSON.stringify(structuredWeeks));
+
+    // Also store flattened days for backwards compatibility
+    const allDays = structuredWeeks.flatMap(w => w.days || []);
+    localStorage.setItem(`cachitas_program_days_${program.id}`, JSON.stringify(allDays));
 
     if (isUuid(program.profile_id) && !isDummyLocalUuid(program.profile_id)) {
       try {
-        await supabase.from('programs').upsert(program);
-        for (const day of days) {
-          const { exercises, ...dayData } = day;
-          await supabase.from('program_days').upsert(dayData);
-          if (exercises && exercises.length > 0) {
-            await supabase.from('program_exercises').upsert(exercises);
+        await supabase.from('programs').upsert({
+          id: program.id,
+          profile_id: program.profile_id,
+          name: program.name,
+          goal: program.goal,
+          days_per_week: program.days_per_week,
+          active: program.active,
+          created_at: program.created_at,
+          updated_at: program.updated_at
+        });
+
+        for (const week of structuredWeeks) {
+          const { days, ...weekData } = week;
+          await supabase.from('program_weeks').upsert(weekData);
+
+          if (days) {
+            for (const day of days) {
+              const { exercises, ...dayData } = day;
+              await supabase.from('program_days').upsert({
+                ...dayData,
+                program_week_id: week.id,
+                week_number: week.week_number
+              });
+
+              if (exercises && exercises.length > 0) {
+                const exRows = exercises.map(({ exercise, ...exData }) => exData);
+                await supabase.from('program_exercises').upsert(exRows);
+              }
+            }
           }
         }
       } catch {
         await SyncService.enqueueOperation({
           table: 'programs',
           action: 'insert',
-          data: { program, days }
+          data: { program: programToSave, weeks: structuredWeeks }
         });
       }
     }
+  }
+
+  static async getProgramWeeks(programId: string): Promise<(ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[]> {
+    if (isUuid(programId) && !isDummyLocalUuid(programId)) {
+      try {
+        const { data: weeks } = await supabase
+          .from('program_weeks')
+          .select('*')
+          .eq('program_id', programId)
+          .order('week_number', { ascending: true });
+
+        if (weeks && weeks.length > 0) {
+          const result = [];
+          for (const week of weeks) {
+            const { data: days } = await supabase
+              .from('program_days')
+              .select('*')
+              .eq('program_week_id', week.id)
+              .order('day_number', { ascending: true });
+
+            const daysWithExercises = [];
+            if (days && days.length > 0) {
+              for (const day of days) {
+                const { data: exercises } = await supabase
+                  .from('program_exercises')
+                  .select('*, exercise:exercise_id(*)')
+                  .eq('program_day_id', day.id)
+                  .order('exercise_order', { ascending: true });
+                daysWithExercises.push({ ...day, exercises: exercises || [] });
+              }
+            }
+            result.push({ ...week, days: daysWithExercises });
+          }
+          return result;
+        }
+      } catch {}
+    }
+
+    const localWeeks = localStorage.getItem(`cachitas_program_weeks_${programId}`);
+    if (localWeeks) {
+      try {
+        return JSON.parse(localWeeks);
+      } catch {}
+    }
+
+    // Fallback: build 1 week from legacy program days
+    const legacyDays = await this.getProgramDays(programId);
+    if (legacyDays.length > 0) {
+      return [
+        {
+          id: `week-1-${programId}`,
+          program_id: programId,
+          week_number: 1,
+          name: 'Semana 1',
+          focus: 'Fuerza base',
+          days: legacyDays
+        }
+      ];
+    }
+
+    return [];
   }
 
   static async getProgramDays(programId: string): Promise<(ProgramDay & { exercises: ProgramExercise[] })[]> {

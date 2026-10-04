@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, Plus, Minus, Timer, Disc, Award, ChevronLeft } from 'lucide-react';
+import { Check, Plus, Minus, Timer, Disc, Award, ChevronLeft, Sparkles, Trophy, Heart } from 'lucide-react';
 import { Profile, WorkoutSession, PersonalRecord, Exercise } from '../types';
 import { WorkoutRepository, ProgramRepository, PersonalRecordRepository } from '../repositories/WorkoutAndOtherRepositories';
+import { ProfileRepository } from '../repositories/ProfileRepository';
 import { ExerciseRepository } from '../repositories/EquipmentAndExerciseRepository';
 import { ProgressionService } from '../services/ProgressionService';
 import { PersonalRecordService } from '../services/PersonalRecordService';
 import { PlateCalculatorService, PlateBreakdown } from '../services/PlateCalculatorService';
+import { PET_AVATARS, CATEGORY_COLORS, getRandomMotivationalMessage } from '../utils/kawaii';
 
 interface WorkoutPageProps {
   profile: Profile;
@@ -27,8 +29,12 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
   const [newPRCelebration, setNewPRCelebration] = useState<string | null>(null);
   const [selectedBarbellWeight, setSelectedBarbellWeight] = useState<number | null>(null);
   const [plateBreakdown, setPlateBreakdown] = useState<PlateBreakdown | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isCompletedSummaryOpen, setIsCompletedSummaryOpen] = useState(false);
+  const [newPRCount, setNewPRCount] = useState(0);
 
   const timerRef = useRef<any>(null);
+  const pet = PET_AVATARS[profile.pet_avatar || 'cat'] || PET_AVATARS.cat;
 
   useEffect(() => {
     initWorkoutSession();
@@ -129,6 +135,11 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
     setLoading(false);
   };
 
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2000);
+  };
+
   const handleToggleSetComplete = async (weIndex: number, setIndex: number) => {
     if (!session || !session.exercises) return;
 
@@ -156,6 +167,7 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
     await WorkoutRepository.saveWorkoutSession(updatedSession);
 
     if (newCompletedState) {
+      showToast(getRandomMotivationalMessage('set'));
       setActiveRestSeconds(120);
       setIsRestTimerRunning(true);
 
@@ -171,6 +183,7 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
 
       if (prResult.isNewPR && prResult.message) {
         setNewPRCelebration(prResult.message);
+        setNewPRCount(prev => prev + 1);
         const newPR: PersonalRecord = {
           id: `pr-${profile.id}-${Date.now()}`,
           profile_id: profile.id,
@@ -213,49 +226,71 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
     setSelectedBarbellWeight(targetWeight);
   };
 
-  const handleCompleteWorkout = async () => {
+  const handleCompleteWorkoutTrigger = async () => {
     if (!session) return;
+    const durationSeconds = Math.round(
+      (new Date().getTime() - new Date(session.started_at).getTime()) / 1000
+    );
+
     const completedSession: WorkoutSession = {
       ...session,
       status: 'completed',
       completed_at: new Date().toISOString(),
-      duration_seconds: Math.round(
-        (new Date().getTime() - new Date(session.started_at).getTime()) / 1000
-      )
+      duration_seconds: durationSeconds
     };
     await WorkoutRepository.saveWorkoutSession(completedSession);
-    onFinishWorkout();
+
+    // Update Profile XP (+250 XP for workout)
+    const newXp = (profile.xp || 0) + 250;
+    await ProfileRepository.updateProfile({ id: profile.id, xp: newXp });
+
+    setIsCompletedSummaryOpen(true);
   };
 
   if (loading || !session) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-lime-400"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-pink-400"></div>
       </div>
     );
   }
 
+  const completedSetsCount = session.exercises?.reduce(
+    (acc, we) => acc + (we.sets?.filter(s => s.completed).length || 0),
+    0
+  ) || 0;
+
   return (
     <div className="space-y-6 pb-28 max-w-2xl mx-auto p-4 sm:p-6">
-      {/* Top Header */}
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-pink-500 border-2 border-black text-zinc-950 font-black px-4 py-2 rounded-2xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-50 text-xs animate-in slide-in-from-top-4">
+          {toastMessage}
+        </div>
+      )}
+
+      {/* Top Bar Header */}
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-zinc-100 cursor-pointer"
+          className="p-2 bg-zinc-900 border-2 border-zinc-800 rounded-2xl text-zinc-400 hover:text-zinc-100 cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
 
         <div className="text-center">
-          <h1 className="text-lg font-black text-zinc-100">Sesión en Curso</h1>
-          <p className="text-[11px] text-zinc-400 font-medium">
-            Volumen Total: <span className="text-lime-400 font-bold">{session.total_volume} kg</span>
+          <div className="flex items-center justify-center gap-1.5 text-xs font-black text-purple-300 font-heading">
+            <span>{pet.emoji}</span>
+            <span>Sesión en Curso</span>
+          </div>
+          <p className="text-[11px] text-zinc-400 font-bold">
+            Volumen: <span className="text-pink-400">{session.total_volume} kg</span>
           </p>
         </div>
 
         <button
-          onClick={handleCompleteWorkout}
-          className="bg-lime-400 hover:bg-lime-300 text-zinc-950 font-black text-xs px-3.5 py-2 rounded-xl active:scale-95 transition-all cursor-pointer"
+          onClick={handleCompleteWorkoutTrigger}
+          className="comic-button bg-lime-400 hover:bg-lime-300 text-zinc-950 font-black text-xs px-4 py-2 rounded-xl cursor-pointer"
         >
           Finalizar
         </button>
@@ -263,109 +298,126 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
 
       {/* Exercises & Sets List */}
       <div className="space-y-6">
-        {session.exercises?.map((we, weIndex) => (
-          <div key={we.id} className="bg-zinc-900/90 border border-zinc-800 rounded-3xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-black text-zinc-100">{we.exercise?.name}</h3>
-                <p className="text-[11px] text-zinc-400 font-medium">
-                  {we.exercise?.category} • Objetivo: 4 × 5 @ {we.sets?.[0]?.target_weight || 80} kg
-                </p>
+        {session.exercises?.map((we, weIndex) => {
+          const catStyle = CATEGORY_COLORS[we.exercise?.category || 'Default'];
+
+          return (
+            <div key={we.id} className="comic-card p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className={`comic-badge text-[9px] px-2 py-0.5 ${catStyle.badge}`}>
+                      {we.exercise?.category}
+                    </span>
+                    <h3 className="text-base font-black text-zinc-100 font-heading">
+                      {we.exercise?.name}
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 font-medium mt-0.5">
+                    Objetivo: {we.sets?.length || 4} series × {we.sets?.[0]?.target_reps || 5} reps @ {we.sets?.[0]?.target_weight || 80} kg
+                  </p>
+                </div>
+
+                {we.exercise?.equipment_required?.includes('barra-olimpica') && (
+                  <button
+                    onClick={() => handleOpenPlateCalculator(we.sets?.[0]?.actual_weight || 80)}
+                    className="p-2 bg-purple-950/60 border-2 border-purple-500 rounded-xl text-purple-200 transition cursor-pointer flex items-center gap-1 text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                    title="Calculadora de discos"
+                  >
+                    <Disc className="w-4 h-4 text-pink-400" />
+                    <span>Discos</span>
+                  </button>
+                )}
               </div>
 
-              {we.exercise?.equipment_required?.includes('barra-olimpica') && (
-                <button
-                  onClick={() => handleOpenPlateCalculator(we.sets?.[0]?.actual_weight || 80)}
-                  className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-300 transition cursor-pointer flex items-center gap-1 text-xs font-bold"
-                  title="Calculadora de discos"
-                >
-                  <Disc className="w-4 h-4 text-lime-400" />
-                  <span>Discos</span>
-                </button>
-              )}
-            </div>
+              {/* Table Headers */}
+              <div className="grid grid-cols-12 gap-2 text-[10px] uppercase font-black text-zinc-400 text-center px-1 font-heading">
+                <span className="col-span-2 text-left">Serie</span>
+                <span className="col-span-4">Peso (kg)</span>
+                <span className="col-span-3">Reps</span>
+                <span className="col-span-3">Estado</span>
+              </div>
 
-            <div className="grid grid-cols-12 gap-2 text-[10px] uppercase font-bold text-zinc-500 text-center px-1">
-              <span className="col-span-2 text-left">Serie</span>
-              <span className="col-span-4">Peso (kg)</span>
-              <span className="col-span-3">Reps</span>
-              <span className="col-span-3">Completado</span>
-            </div>
-
-            <div className="space-y-2.5">
-              {we.sets?.map((st, setIndex) => (
-                <div
-                  key={st.id}
-                  className={`grid grid-cols-12 gap-2 items-center p-2.5 rounded-2xl border transition-all ${
-                    st.completed
-                      ? 'bg-lime-950/20 border-lime-500/40 text-zinc-100'
-                      : 'bg-zinc-950/60 border-zinc-800/80 text-zinc-300'
-                  }`}
-                >
-                  <span className="col-span-2 text-xs font-black text-zinc-400 pl-1">
-                    #{st.set_number}
-                  </span>
-
-                  <div className="col-span-4 flex items-center justify-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-                    <button
-                      onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_weight', -2.5)}
-                      className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="text-xs font-bold text-zinc-100 w-10 text-center">
-                      {st.actual_weight}
+              {/* Sets List */}
+              <div className="space-y-2.5">
+                {we.sets?.map((st, setIndex) => (
+                  <div
+                    key={st.id}
+                    className={`grid grid-cols-12 gap-2 items-center p-2.5 rounded-2xl border-2 transition-all ${
+                      st.completed
+                        ? 'bg-pink-950/20 border-pink-500 text-zinc-100 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-300'
+                    }`}
+                  >
+                    <span className="col-span-2 text-xs font-black text-pink-400 pl-1 font-heading">
+                      #{st.set_number}
                     </span>
-                    <button
-                      onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_weight', 2.5)}
-                      className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
 
-                  <div className="col-span-3 flex items-center justify-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-                    <button
-                      onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_reps', -1)}
-                      className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="text-xs font-bold text-zinc-100 w-6 text-center">
-                      {st.actual_reps}
-                    </span>
-                    <button
-                      onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_reps', 1)}
-                      className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                    {/* Weight Controls */}
+                    <div className="col-span-4 flex items-center justify-center gap-1 bg-zinc-900 border-2 border-zinc-800 rounded-xl p-1">
+                      <button
+                        onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_weight', -2.5)}
+                        className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90 cursor-pointer"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-xs font-black text-zinc-100 w-10 text-center font-heading">
+                        {st.actual_weight}
+                      </span>
+                      <button
+                        onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_weight', 2.5)}
+                        className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
 
-                  <div className="col-span-3 flex justify-center">
-                    <button
-                      onClick={() => handleToggleSetComplete(weIndex, setIndex)}
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all cursor-pointer active:scale-90 ${
-                        st.completed
-                          ? 'bg-lime-400 border-lime-400 text-zinc-950 shadow-md shadow-lime-400/20'
-                          : 'bg-zinc-900 border-zinc-700 text-transparent hover:border-zinc-500'
-                      }`}
-                    >
-                      <Check className="w-5 h-5 stroke-[3]" />
-                    </button>
+                    {/* Reps Controls */}
+                    <div className="col-span-3 flex items-center justify-center gap-1 bg-zinc-900 border-2 border-zinc-800 rounded-xl p-1">
+                      <button
+                        onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_reps', -1)}
+                        className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90 cursor-pointer"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-xs font-black text-zinc-100 w-6 text-center font-heading">
+                        {st.actual_reps}
+                      </span>
+                      <button
+                        onClick={() => handleUpdateSetValue(weIndex, setIndex, 'actual_reps', 1)}
+                        className="p-1 text-zinc-400 hover:text-zinc-100 active:scale-90 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Complete Checkbox Button */}
+                    <div className="col-span-3 flex justify-center">
+                      <button
+                        onClick={() => handleToggleSetComplete(weIndex, setIndex)}
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center border-2 transition-all cursor-pointer active:scale-90 ${
+                          st.completed
+                            ? 'bg-pink-500 border-black text-zinc-950 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
+                            : 'bg-zinc-900 border-zinc-700 text-transparent hover:border-zinc-500'
+                        }`}
+                      >
+                        <Check className="w-5 h-5 stroke-[3]" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
+      {/* Floating Rest Timer */}
       {isRestTimerRunning && activeRestSeconds !== null && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-zinc-900/95 border border-lime-500/50 backdrop-blur-md px-6 py-3 rounded-full flex items-center gap-4 shadow-2xl z-40">
-          <div className="flex items-center gap-2 text-lime-400">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-zinc-900 border-3 border-pink-500 px-6 py-3 rounded-2xl flex items-center gap-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-40">
+          <div className="flex items-center gap-2 text-pink-400">
             <Timer className="w-5 h-5 animate-pulse" />
-            <span className="font-mono text-lg font-black tracking-widest text-zinc-100">
+            <span className="font-mono text-xl font-black text-zinc-100">
               {Math.floor(activeRestSeconds / 60)
                 .toString()
                 .padStart(2, '0')}
@@ -374,16 +426,16 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2 border-l border-zinc-800 pl-3">
+          <div className="flex items-center gap-2 border-l-2 border-zinc-800 pl-3">
             <button
               onClick={() => setActiveRestSeconds(prev => (prev || 0) + 30)}
-              className="text-xs font-bold bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 rounded-lg text-zinc-200"
+              className="text-xs font-black bg-purple-900/60 border-2 border-purple-500 px-2.5 py-1 rounded-lg text-purple-200 cursor-pointer"
             >
               +30s
             </button>
             <button
               onClick={() => setIsRestTimerRunning(false)}
-              className="text-xs font-bold text-red-400 hover:text-red-300 px-2 py-1"
+              className="text-xs font-black text-red-400 hover:text-red-300 px-2 py-1 cursor-pointer"
             >
               Saltar
             </button>
@@ -391,57 +443,120 @@ export const WorkoutPage: React.FC<WorkoutPageProps> = ({
         </div>
       )}
 
+      {/* PR Celebration Modal */}
       {newPRCelebration && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-amber-500/50 rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl animate-in zoom-in-95">
-            <div className="w-16 h-16 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mx-auto text-amber-400">
-              <Award className="w-8 h-8" />
+          <div className="comic-card-yellow max-w-xs w-full p-6 text-center space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/30 border-2 border-amber-400 flex items-center justify-center mx-auto text-amber-300 text-3xl shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+              🏆
             </div>
-            <h3 className="text-xl font-black text-amber-400">¡NUEVO RÉCORD!</h3>
-            <p className="text-sm text-zinc-200 font-medium">{newPRCelebration}</p>
+            <h3 className="text-xl font-black text-amber-300 font-heading">✨ ¡NUEVO RÉCORD! ✨</h3>
+            <p className="text-sm text-zinc-100 font-extrabold">{newPRCelebration}</p>
+
+            <div className="speech-bubble text-xs text-amber-200 font-bold">
+              {pet.emoji} "{pet.celebration}"
+            </div>
+
             <button
               onClick={() => setNewPRCelebration(null)}
-              className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-3 rounded-xl text-xs mt-2"
+              className="w-full comic-button bg-amber-400 hover:bg-amber-300 text-zinc-950 py-3 rounded-xl text-xs mt-2 cursor-pointer"
             >
-              ¡A POR MÁS!
+              😎 ¡A POR MÁS!
             </button>
           </div>
         </div>
       )}
 
+      {/* Plate Calculator Modal */}
       {selectedBarbellWeight && plateBreakdown && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 max-w-xs w-full space-y-4 text-center shadow-2xl">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-              <span className="text-xs font-extrabold text-zinc-400 uppercase">Barra {selectedBarbellWeight} kg</span>
+          <div className="comic-card-purple max-w-xs w-full p-6 space-y-4 text-center shadow-2xl">
+            <div className="flex items-center justify-between border-b-2 border-purple-500/40 pb-3">
+              <span className="text-xs font-extrabold text-purple-200 uppercase font-heading">
+                Barra {selectedBarbellWeight} kg
+              </span>
               <button
                 onClick={() => setSelectedBarbellWeight(null)}
-                className="text-xs text-zinc-400 hover:text-zinc-100"
+                className="text-xs text-purple-300 hover:text-zinc-100 font-bold"
               >
                 Cerrar
               </button>
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs text-zinc-400">
-                Peso por lado: <span className="text-lime-400 font-bold">{plateBreakdown.weightPerSide} kg</span>
+              <p className="text-xs text-purple-200">
+                Peso por lado: <span className="text-pink-400 font-black">{plateBreakdown.weightPerSide} kg</span>
               </p>
 
-              <div className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800/80 space-y-2">
+              <div className="bg-zinc-950 p-4 rounded-2xl border-2 border-zinc-800 space-y-2">
                 {plateBreakdown.platesPerSide.length > 0 ? (
                   plateBreakdown.platesPerSide.map(item => (
                     <div key={item.plate} className="flex justify-between items-center text-xs font-bold text-zinc-200">
                       <span>Disco {item.plate} kg</span>
-                      <span className="bg-lime-400/10 border border-lime-400/30 text-lime-400 px-2.5 py-1 rounded-lg">
+                      <span className="comic-badge bg-pink-500/20 text-pink-300 border-pink-400 px-2.5 py-0.5">
                         × {item.count}
                       </span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-zinc-500">Solo barra olímpica de 20 kg</p>
+                  <p className="text-xs text-zinc-400">Solo barra olímpica de 20 kg</p>
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* FINAL WORKOUT COMPLETE SUMMARY MODAL (Section 39) */}
+      {isCompletedSummaryOpen && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="comic-card-pink max-w-sm w-full p-6 text-center space-y-5 shadow-2xl animate-in zoom-in-95">
+            <div className="space-y-1">
+              <div className="text-4xl">🎉🎉🎉</div>
+              <h2 className="text-2xl font-black text-zinc-100 font-heading mt-2">
+                ¡MISIÓN COMPLETADA!
+              </h2>
+            </div>
+
+            {/* Stats Breakdown */}
+            <div className="grid grid-cols-2 gap-2 text-left text-xs font-bold pt-2">
+              <div className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-800">
+                <span className="text-zinc-400 block text-[10px]">Series Completadas</span>
+                <span className="text-base font-black text-pink-400">💪 {completedSetsCount} series</span>
+              </div>
+              <div className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-800">
+                <span className="text-zinc-400 block text-[10px]">Volumen Total</span>
+                <span className="text-base font-black text-lime-400">🏋️ {session.total_volume.toLocaleString()} kg</span>
+              </div>
+              <div className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-800">
+                <span className="text-zinc-400 block text-[10px]">Tiempo</span>
+                <span className="text-base font-black text-blue-400">
+                  ⏱️ {Math.round((session.duration_seconds || 1800) / 60)} min
+                </span>
+              </div>
+              <div className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-800">
+                <span className="text-zinc-400 block text-[10px]">Nuevos PRs</span>
+                <span className="text-base font-black text-amber-400">🔥 +{newPRCount} PRs</span>
+              </div>
+            </div>
+
+            {/* Mascot Quote */}
+            <div className="speech-bubble text-xs text-pink-100 font-bold">
+              {pet.emoji} "{pet.celebration}"
+            </div>
+
+            {/* XP Awarded Banner */}
+            <div className="comic-badge bg-amber-500/20 text-amber-300 border-amber-400 text-sm py-2 px-4 flex items-center justify-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400 fill-amber-400" />
+              <span>+250 XP RECOMPENSA</span>
+            </div>
+
+            <button
+              onClick={onFinishWorkout}
+              className="w-full comic-button bg-pink-500 hover:bg-pink-400 text-zinc-950 py-3.5 rounded-2xl text-xs cursor-pointer font-black"
+            >
+              VOLVER AL PLAN
+            </button>
           </div>
         </div>
       )}

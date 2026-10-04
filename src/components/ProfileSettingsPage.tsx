@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Lock, Download, Trash2, Shield, Settings, KeyRound, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Lock, Download, Trash2, KeyRound, Sparkles, Check } from 'lucide-react';
 import { Profile } from '../types';
 import { ProfileRepository } from '../repositories/ProfileRepository';
 import { WorkoutRepository, PersonalRecordRepository, BodyWeightRepository } from '../repositories/WorkoutAndOtherRepositories';
 import { PinService } from '../services/PinService';
+import { PET_AVATARS } from '../utils/kawaii';
 
 interface ProfileSettingsPageProps {
   profile: Profile;
@@ -22,6 +23,16 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
+
+  const selectedPetKey = profile.pet_avatar || 'cat';
+
+  const handleSelectPet = async (petId: string) => {
+    const updated = await ProfileRepository.updateProfile({
+      id: profile.id,
+      pet_avatar: petId
+    });
+    onProfileUpdated(updated);
+  };
 
   const handleSavePin = async () => {
     setPinError(null);
@@ -128,23 +139,61 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-24 max-w-2xl mx-auto p-4 sm:p-6">
+    <div className="space-y-6 pb-28 max-w-2xl mx-auto p-4 sm:p-6">
       <div>
-        <h1 className="text-2xl font-black text-zinc-100">Ajustes del Perfil</h1>
-        <p className="text-xs text-zinc-400 mt-1">
+        <h1 className="text-2xl font-black text-zinc-100 font-heading">Ajustes & Mascota</h1>
+        <p className="text-xs text-zinc-400 mt-1 font-medium">
           {profile.name || `Perfil ${profile.slot}`} • Slot {profile.slot}
         </p>
       </div>
 
+      {/* SELECT PET MASCOT / AVATAR (Section 34) */}
+      <div className="comic-card-purple p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-purple-400 fill-purple-400" />
+            <h3 className="text-base font-black text-zinc-100 font-heading">Tu Mascota / Avatar</h3>
+          </div>
+          <span className="comic-badge bg-purple-500/20 text-purple-300 border-purple-400 text-[10px] px-3 py-1">
+            {profile.xp || 250} XP
+          </span>
+        </div>
+
+        <p className="text-xs text-purple-200 font-medium">
+          Elige la mascota que te acompañará en tus entrenamientos, PRs y notificaciones:
+        </p>
+
+        <div className="grid grid-cols-4 gap-2">
+          {Object.values(PET_AVATARS).map(pet => {
+            const isSelected = selectedPetKey === pet.id;
+
+            return (
+              <button
+                key={pet.id}
+                onClick={() => handleSelectPet(pet.id)}
+                className={`p-3 rounded-2xl border-2 text-center transition cursor-pointer active:scale-95 ${
+                  isSelected
+                    ? 'bg-purple-500 border-black text-zinc-950 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] font-black'
+                    : 'bg-zinc-950/80 border-zinc-800 text-zinc-300 hover:border-purple-500/40'
+                }`}
+              >
+                <div className="text-3xl mb-1">{pet.emoji}</div>
+                <div className="text-[10px] font-heading font-bold">{pet.name.split(' ')[0]}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Security & PIN Section */}
-      <div className="bg-zinc-900/90 border border-zinc-800 rounded-3xl p-5 space-y-4">
+      <div className="comic-card p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-zinc-800 rounded-2xl text-lime-400">
+            <div className="p-2.5 bg-zinc-900 border-2 border-zinc-800 rounded-2xl text-pink-400">
               <KeyRound className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-extrabold text-zinc-100">Protección PIN (4 dígitos)</h3>
+              <h3 className="text-sm font-black text-zinc-100 font-heading">Protección PIN (4 dígitos)</h3>
               <p className="text-xs text-zinc-400 font-medium">
                 {profile.pin_enabled ? 'Protección activa con PIN' : 'Sin PIN de protección'}
               </p>
@@ -156,7 +205,7 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
               setShowPinModal(true);
               setPinError(null);
             }}
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs px-3.5 py-2 rounded-xl transition cursor-pointer"
+            className="comic-button bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs px-3.5 py-2 rounded-xl transition cursor-pointer"
           >
             {profile.pin_enabled ? 'Cambiar / Desactivar' : 'Activar PIN'}
           </button>
@@ -164,15 +213,15 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
       </div>
 
       {/* Lock Profile Button */}
-      <div className="bg-zinc-900/90 border border-zinc-800 rounded-3xl p-5 flex items-center justify-between">
+      <div className="comic-card p-5 flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-extrabold text-zinc-100">Bloquear Perfil</h3>
+          <h3 className="text-sm font-black text-zinc-100 font-heading">Bloquear Perfil</h3>
           <p className="text-xs text-zinc-400 font-medium">Vuelve a la pantalla de selección de perfil</p>
         </div>
 
         <button
           onClick={onLockProfile}
-          className="bg-lime-400 hover:bg-lime-300 text-zinc-950 font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition active:scale-95 cursor-pointer"
+          className="comic-button bg-pink-500 hover:bg-pink-400 text-zinc-950 font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer"
         >
           <Lock className="w-4 h-4" />
           <span>Bloquear</span>
@@ -180,31 +229,31 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
       </div>
 
       {/* Backup & Export Data */}
-      <div className="bg-zinc-900/90 border border-zinc-800 rounded-3xl p-5 flex items-center justify-between">
+      <div className="comic-card p-5 flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-extrabold text-zinc-100">Exportar Datos (Backup JSON)</h3>
+          <h3 className="text-sm font-black text-zinc-100 font-heading">Exportar Datos (Backup JSON)</h3>
           <p className="text-xs text-zinc-400 font-medium">Descarga todo tu historial de entrenamientos y PRs</p>
         </div>
 
         <button
           onClick={handleExportData}
-          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition active:scale-95 cursor-pointer"
+          className="comic-button bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer"
         >
-          <Download className="w-4 h-4 text-lime-400" />
+          <Download className="w-4 h-4 text-pink-400" />
           <span>Exportar</span>
         </button>
       </div>
 
       {/* Reset Profile (Danger Zone) */}
-      <div className="bg-red-950/20 border border-red-500/30 rounded-3xl p-5 flex items-center justify-between">
+      <div className="bg-red-950/30 border-3 border-red-500 rounded-2xl p-5 flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <div>
-          <h3 className="text-sm font-extrabold text-red-400">Resetear Perfil</h3>
+          <h3 className="text-sm font-black text-red-400 font-heading">Resetear Perfil</h3>
           <p className="text-xs text-zinc-400 font-medium">Elimina entrenamientos y PRs preservando el Slot {profile.slot}</p>
         </div>
 
         <button
           onClick={() => setShowResetModal(true)}
-          className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-400 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 transition cursor-pointer"
+          className="comic-button bg-red-500/20 hover:bg-red-500/30 border-red-500 text-red-400 font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer"
         >
           <Trash2 className="w-4 h-4" />
           <span>Resetear</span>
@@ -214,44 +263,44 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
       {/* PIN Modal */}
       {showPinModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 max-w-xs w-full space-y-4 shadow-2xl">
-            <h3 className="text-lg font-black text-zinc-100">Configuración de PIN</h3>
+          <div className="comic-card-purple max-w-xs w-full p-6 space-y-4 shadow-2xl">
+            <h3 className="text-lg font-black text-zinc-100 font-heading">Configuración de PIN</h3>
 
-            {pinError && <p className="text-xs text-red-400 font-medium">{pinError}</p>}
+            {pinError && <p className="text-xs text-red-400 font-bold">{pinError}</p>}
 
             <div className="space-y-3 text-xs">
               {profile.pin_enabled && (
                 <div>
-                  <label className="block text-zinc-400 mb-1">PIN Actual</label>
+                  <label className="block text-purple-200 font-bold mb-1">PIN Actual</label>
                   <input
                     type="password"
                     maxLength={4}
                     value={currentPin}
                     onChange={e => setCurrentPin(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-zinc-100 text-center text-lg tracking-widest"
+                    className="w-full bg-zinc-950 border-2 border-zinc-800 rounded-xl px-3 py-2 text-zinc-100 text-center text-lg tracking-widest font-black"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-zinc-400 mb-1">Nuevo PIN (4 dígitos)</label>
+                <label className="block text-purple-200 font-bold mb-1">Nuevo PIN (4 dígitos)</label>
                 <input
                   type="password"
                   maxLength={4}
                   value={newPin}
                   onChange={e => setNewPin(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-zinc-100 text-center text-lg tracking-widest"
+                  className="w-full bg-zinc-950 border-2 border-zinc-800 rounded-xl px-3 py-2 text-zinc-100 text-center text-lg tracking-widest font-black"
                 />
               </div>
 
               <div>
-                <label className="block text-zinc-400 mb-1">Confirmar Nuevo PIN</label>
+                <label className="block text-purple-200 font-bold mb-1">Confirmar Nuevo PIN</label>
                 <input
                   type="password"
                   maxLength={4}
                   value={confirmPin}
                   onChange={e => setConfirmPin(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-zinc-100 text-center text-lg tracking-widest"
+                  className="w-full bg-zinc-950 border-2 border-zinc-800 rounded-xl px-3 py-2 text-zinc-100 text-center text-lg tracking-widest font-black"
                 />
               </div>
             </div>
@@ -259,7 +308,7 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
             <div className="flex flex-col gap-2 pt-2">
               <button
                 onClick={handleSavePin}
-                className="w-full bg-lime-400 text-zinc-950 font-black py-3 rounded-xl text-xs active:scale-95"
+                className="w-full comic-button bg-lime-400 text-zinc-950 font-black py-3 rounded-xl text-xs cursor-pointer"
               >
                 Guardar PIN
               </button>
@@ -267,15 +316,15 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
               {profile.pin_enabled && (
                 <button
                   onClick={handleDisablePin}
-                  className="w-full bg-red-500/20 text-red-400 border border-red-500/30 font-bold py-2.5 rounded-xl text-xs"
+                  className="w-full comic-button bg-red-500/20 text-red-400 border-red-500 font-bold py-2.5 rounded-xl text-xs cursor-pointer"
                 >
-                  Desactivar Proteccion PIN
+                  Desactivar PIN
                 </button>
               )}
 
               <button
                 onClick={() => setShowPinModal(false)}
-                className="w-full text-zinc-400 hover:text-zinc-200 text-xs py-1"
+                className="w-full text-zinc-400 hover:text-zinc-200 text-xs py-1 cursor-pointer"
               >
                 Cancelar
               </button>
@@ -287,8 +336,8 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
       {/* Confirm Reset Modal */}
       {showResetModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-red-500/40 rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl">
-            <h3 className="text-lg font-black text-red-400">¿Resetear este Perfil?</h3>
+          <div className="comic-card max-w-xs w-full p-6 text-center space-y-4 shadow-2xl border-red-500">
+            <h3 className="text-lg font-black text-red-400 font-heading">¿Resetear este Perfil?</h3>
             <p className="text-xs text-zinc-400">
               Se eliminarán todos los entrenamientos, PRs y preferencias. El perfil volverá a estar libre como Perfil {profile.slot}.
             </p>
@@ -296,13 +345,13 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setShowResetModal(false)}
-                className="flex-1 bg-zinc-800 text-zinc-300 font-bold py-3 rounded-xl text-xs"
+                className="flex-1 comic-button bg-zinc-800 text-zinc-300 font-bold py-3 rounded-xl text-xs cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleResetProfile}
-                className="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl text-xs"
+                className="flex-1 comic-button bg-red-500 text-zinc-950 font-black py-3 rounded-xl text-xs cursor-pointer"
               >
                 Confirmar
               </button>

@@ -3,6 +3,7 @@ import { PinService } from '../services/PinService';
 import { ProgressionService } from '../services/ProgressionService';
 import { PersonalRecordService } from '../services/PersonalRecordService';
 import { PlateCalculatorService } from '../services/PlateCalculatorService';
+import { ProgramGeneratorService } from '../services/ProgramGeneratorService';
 
 describe('PinService', () => {
   it('hashes a 4-digit PIN deterministically using SHA-256', async () => {
@@ -102,5 +103,26 @@ describe('PlateCalculatorService', () => {
     expect(breakdown.weightPerSide).toBe(40);
     expect(breakdown.platesPerSide).toEqual([{ plate: 20, count: 2 }]);
     expect(breakdown.remainder).toBe(0);
+  });
+});
+
+describe('ProgramGeneratorService', () => {
+  it('generates a periodized 4-week program structure with 4 weeks and daily exercises', async () => {
+    const dummyProfileId = '00000000-0000-0000-0000-000000000001';
+    const result = await ProgramGeneratorService.generateFourWeekPlan(dummyProfileId, 'Powerlifting', 'Intermedio');
+
+    expect(result.program).toBeDefined();
+    expect(result.weeks).toHaveLength(4);
+    expect(result.weeks[0].week_number).toBe(1);
+    expect(result.weeks[1].week_number).toBe(2);
+    expect(result.weeks[2].week_number).toBe(3);
+    expect(result.weeks[3].week_number).toBe(4);
+
+    // Week 1 should have 4 days
+    expect(result.weeks[0].days).toHaveLength(4);
+    // Week 4 (Deload) should have lower volume (fewer main sets)
+    expect(result.weeks[3].days![0].exercises![0].target_sets).toBeLessThan(
+      result.weeks[0].days![0].exercises![0].target_sets
+    );
   });
 });
