@@ -1,20 +1,23 @@
 import { supabase } from '../lib/supabase';
 import { Program, ProgramDay, ProgramExercise, WorkoutSession, WorkoutExercise, WorkoutSet, PersonalRecord, BodyWeightEntry, ProfilePreferences } from '../types';
 import { SyncService } from '../services/SyncService';
+import { isUuid, isDummyLocalUuid } from '../utils/uuid';
 
 export class ProgramRepository {
   private static LOCAL_PROGRAMS_KEY = 'cachitas_programs_';
 
   static async getActiveProgramForProfile(profileId: string): Promise<Program | null> {
-    try {
-      const { data } = await supabase
-        .from('programs')
-        .select('*')
-        .eq('profile_id', profileId)
-        .eq('active', true)
-        .single();
-      if (data) return data;
-    } catch {}
+    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+      try {
+        const { data } = await supabase
+          .from('programs')
+          .select('*')
+          .eq('profile_id', profileId)
+          .eq('active', true)
+          .single();
+        if (data) return data;
+      } catch {}
+    }
 
     const local = localStorage.getItem(this.LOCAL_PROGRAMS_KEY + profileId);
     if (local) {
@@ -34,45 +37,49 @@ export class ProgramRepository {
     localStorage.setItem(this.LOCAL_PROGRAMS_KEY + program.profile_id, JSON.stringify(programs));
     localStorage.setItem(`cachitas_program_days_${program.id}`, JSON.stringify(days));
 
-    try {
-      await supabase.from('programs').upsert(program);
-      for (const day of days) {
-        const { exercises, ...dayData } = day;
-        await supabase.from('program_days').upsert(dayData);
-        if (exercises && exercises.length > 0) {
-          await supabase.from('program_exercises').upsert(exercises);
+    if (isUuid(program.profile_id) && !isDummyLocalUuid(program.profile_id)) {
+      try {
+        await supabase.from('programs').upsert(program);
+        for (const day of days) {
+          const { exercises, ...dayData } = day;
+          await supabase.from('program_days').upsert(dayData);
+          if (exercises && exercises.length > 0) {
+            await supabase.from('program_exercises').upsert(exercises);
+          }
         }
+      } catch {
+        await SyncService.enqueueOperation({
+          table: 'programs',
+          action: 'insert',
+          data: { program, days }
+        });
       }
-    } catch {
-      await SyncService.enqueueOperation({
-        table: 'programs',
-        action: 'insert',
-        data: { program, days }
-      });
     }
   }
 
   static async getProgramDays(programId: string): Promise<(ProgramDay & { exercises: ProgramExercise[] })[]> {
-    try {
-      const { data: days } = await supabase
-        .from('program_days')
-        .select('*')
-        .eq('program_id', programId)
-        .order('day_number', { ascending: true });
+    if (isUuid(programId) && !isDummyLocalUuid(programId)) {
+      try {
+        const { data: days } = await supabase
+          .from('program_days')
+          .select('*')
+          .eq('program_id', programId)
+          .order('day_number', { ascending: true });
 
-      if (days && days.length > 0) {
-        const result = [];
-        for (const day of days) {
-          const { data: exercises } = await supabase
-            .from('program_exercises')
-            .select('*, exercise:exercise_id(*)')
-            .eq('program_day_id', day.id)
-            .order('exercise_order', { ascending: true });
-          result.push({ ...day, exercises: exercises || [] });
+        if (days && days.length > 0) {
+          const result = [];
+          for (const day of days) {
+            const { data: exercises } = await supabase
+              .from('program_exercises')
+              .select('*, exercise:exercise_id(*)')
+              .eq('program_day_id', day.id)
+              .order('exercise_order', { ascending: true });
+            result.push({ ...day, exercises: exercises || [] });
+          }
+          return result;
         }
-        return result;
-      }
-    } catch {}
+      } catch {}
+    }
 
     const local = localStorage.getItem(`cachitas_program_days_${programId}`);
     if (local) {
@@ -86,14 +93,16 @@ export class WorkoutRepository {
   private static LOCAL_SESSIONS_KEY = 'cachitas_workout_sessions_';
 
   static async getSessionsForProfile(profileId: string): Promise<WorkoutSession[]> {
-    try {
-      const { data } = await supabase
-        .from('workout_sessions')
-        .select('*, exercises:workout_exercises(*, exercise:exercise_id(*), sets:workout_sets(*))')
-        .eq('profile_id', profileId)
-        .order('created_at', { ascending: false });
-      if (data) return data;
-    } catch {}
+    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+      try {
+        const { data } = await supabase
+          .from('workout_sessions')
+          .select('*, exercises:workout_exercises(*, exercise:exercise_id(*), sets:workout_sets(*))')
+          .eq('profile_id', profileId)
+          .order('created_at', { ascending: false });
+        if (data) return data;
+      } catch {}
+    }
 
     const local = localStorage.getItem(this.LOCAL_SESSIONS_KEY + profileId);
     if (local) {
@@ -112,26 +121,28 @@ export class WorkoutRepository {
     }
     localStorage.setItem(this.LOCAL_SESSIONS_KEY + session.profile_id, JSON.stringify(sessions));
 
-    try {
-      const { exercises, ...sessionData } = session;
-      await supabase.from('workout_sessions').upsert(sessionData);
-      if (exercises) {
-        for (const ex of exercises) {
-          const { sets, exercise, ...exData } = ex;
-          await supabase.from('workout_exercises').upsert(exData);
-          if (sets) {
-            for (const st of sets) {
-              await supabase.from('workout_sets').upsert(st);
+    if (isUuid(session.profile_id) && !isDummyLocalUuid(session.profile_id)) {
+      try {
+        const { exercises, ...sessionData } = session;
+        await supabase.from('workout_sessions').upsert(sessionData);
+        if (exercises) {
+          for (const ex of exercises) {
+            const { sets, exercise, ...exData } = ex;
+            await supabase.from('workout_exercises').upsert(exData);
+            if (sets) {
+              for (const st of sets) {
+                await supabase.from('workout_sets').upsert(st);
+              }
             }
           }
         }
+      } catch {
+        await SyncService.enqueueOperation({
+          table: 'workout_sessions',
+          action: 'insert',
+          data: session
+        });
       }
-    } catch {
-      await SyncService.enqueueOperation({
-        table: 'workout_sessions',
-        action: 'insert',
-        data: session
-      });
     }
   }
 
@@ -145,13 +156,15 @@ export class PersonalRecordRepository {
   private static LOCAL_PRS_KEY = 'cachitas_prs_';
 
   static async getPRsForProfile(profileId: string): Promise<PersonalRecord[]> {
-    try {
-      const { data } = await supabase
-        .from('personal_records')
-        .select('*, exercise:exercise_id(*)')
-        .eq('profile_id', profileId);
-      if (data) return data;
-    } catch {}
+    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+      try {
+        const { data } = await supabase
+          .from('personal_records')
+          .select('*, exercise:exercise_id(*)')
+          .eq('profile_id', profileId);
+        if (data) return data;
+      } catch {}
+    }
 
     const local = localStorage.getItem(this.LOCAL_PRS_KEY + profileId);
     if (local) {
@@ -170,15 +183,17 @@ export class PersonalRecordRepository {
     }
     localStorage.setItem(this.LOCAL_PRS_KEY + pr.profile_id, JSON.stringify(prs));
 
-    try {
-      const { exercise, ...prData } = pr;
-      await supabase.from('personal_records').upsert(prData);
-    } catch {
-      await SyncService.enqueueOperation({
-        table: 'personal_records',
-        action: 'insert',
-        data: pr
-      });
+    if (isUuid(pr.profile_id) && !isDummyLocalUuid(pr.profile_id)) {
+      try {
+        const { exercise, ...prData } = pr;
+        await supabase.from('personal_records').upsert(prData);
+      } catch {
+        await SyncService.enqueueOperation({
+          table: 'personal_records',
+          action: 'insert',
+          data: pr
+        });
+      }
     }
   }
 }
@@ -187,14 +202,16 @@ export class BodyWeightRepository {
   private static LOCAL_BW_KEY = 'cachitas_bodyweight_';
 
   static async getEntriesForProfile(profileId: string): Promise<BodyWeightEntry[]> {
-    try {
-      const { data } = await supabase
-        .from('body_weight_entries')
-        .select('*')
-        .eq('profile_id', profileId)
-        .order('recorded_at', { ascending: true });
-      if (data) return data;
-    } catch {}
+    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+      try {
+        const { data } = await supabase
+          .from('body_weight_entries')
+          .select('*')
+          .eq('profile_id', profileId)
+          .order('recorded_at', { ascending: true });
+        if (data) return data;
+      } catch {}
+    }
 
     const local = localStorage.getItem(this.LOCAL_BW_KEY + profileId);
     if (local) {
@@ -214,14 +231,16 @@ export class BodyWeightRepository {
     entries.push(entry);
     localStorage.setItem(this.LOCAL_BW_KEY + profileId, JSON.stringify(entries));
 
-    try {
-      await supabase.from('body_weight_entries').insert(entry);
-    } catch {
-      await SyncService.enqueueOperation({
-        table: 'body_weight_entries',
-        action: 'insert',
-        data: entry
-      });
+    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+      try {
+        await supabase.from('body_weight_entries').insert(entry);
+      } catch {
+        await SyncService.enqueueOperation({
+          table: 'body_weight_entries',
+          action: 'insert',
+          data: entry
+        });
+      }
     }
     return entry;
   }
@@ -241,14 +260,16 @@ export class PreferencesRepository {
       updated_at: new Date().toISOString()
     };
 
-    try {
-      const { data } = await supabase
-        .from('profile_preferences')
-        .select('*')
-        .eq('profile_id', profileId)
-        .single();
-      if (data) return data;
-    } catch {}
+    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+      try {
+        const { data } = await supabase
+          .from('profile_preferences')
+          .select('*')
+          .eq('profile_id', profileId)
+          .single();
+        if (data) return data;
+      } catch {}
+    }
 
     const local = localStorage.getItem(this.LOCAL_PREFS_KEY + profileId);
     if (local) {
@@ -259,8 +280,10 @@ export class PreferencesRepository {
 
   static async savePreferences(prefs: ProfilePreferences): Promise<void> {
     localStorage.setItem(this.LOCAL_PREFS_KEY + prefs.profile_id, JSON.stringify(prefs));
-    try {
-      await supabase.from('profile_preferences').upsert(prefs);
-    } catch {}
+    if (isUuid(prefs.profile_id) && !isDummyLocalUuid(prefs.profile_id)) {
+      try {
+        await supabase.from('profile_preferences').upsert(prefs);
+      } catch {}
+    }
   }
 }

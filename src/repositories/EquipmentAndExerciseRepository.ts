@@ -1,7 +1,8 @@
 import { supabase } from '../lib/supabase';
 import { EquipmentItem, Exercise } from '../types';
+import { isUuid, isDummyLocalUuid } from '../utils/uuid';
 
-async function withTimeout<T>(promise: PromiseLike<T>, ms = 500): Promise<T> {
+async function withTimeout<T>(promise: PromiseLike<T>, ms = 1500): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('Network timeout')), ms)
   );
@@ -440,19 +441,21 @@ export class EquipmentRepository {
   }
 
   static async getProfileEquipmentSlugs(profileId: string): Promise<string[]> {
-    try {
-      const res: any = await withTimeout(
-        supabase
-          .from('profile_equipment')
-          .select('equipment:equipment_id(slug)')
-          .eq('profile_id', profileId)
-      );
+    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+      try {
+        const res: any = await withTimeout(
+          supabase
+            .from('profile_equipment')
+            .select('equipment:equipment_id(slug)')
+            .eq('profile_id', profileId)
+        );
 
-      if (res.data && res.data.length > 0) {
-        return res.data.map((item: any) => item.equipment?.slug).filter(Boolean);
+        if (res.data && res.data.length > 0) {
+          return res.data.map((item: any) => item.equipment?.slug).filter(Boolean);
+        }
+      } catch {
+        // offline
       }
-    } catch {
-      // offline
     }
 
     const local = localStorage.getItem(this.LOCAL_EQ_KEY + profileId);
@@ -466,22 +469,24 @@ export class EquipmentRepository {
 
   static async setProfileEquipmentSlugs(profileId: string, slugs: string[]): Promise<void> {
     localStorage.setItem(this.LOCAL_EQ_KEY + profileId, JSON.stringify(slugs));
-    try {
-      await withTimeout(supabase.from('profile_equipment').delete().eq('profile_id', profileId));
-      const allEq = await this.getAllEquipment();
-      const rows = slugs
-        .map(slug => allEq.find(e => e.slug === slug))
-        .filter(Boolean)
-        .map(eq => ({
-          profile_id: profileId,
-          equipment_id: eq!.id
-        }));
+    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+      try {
+        await withTimeout(supabase.from('profile_equipment').delete().eq('profile_id', profileId));
+        const allEq = await this.getAllEquipment();
+        const rows = slugs
+          .map(slug => allEq.find(e => e.slug === slug))
+          .filter(Boolean)
+          .map(eq => ({
+            profile_id: profileId,
+            equipment_id: eq!.id
+          }));
 
-      if (rows.length > 0) {
-        await withTimeout(supabase.from('profile_equipment').insert(rows));
+        if (rows.length > 0) {
+          await withTimeout(supabase.from('profile_equipment').insert(rows));
+        }
+      } catch {
+        // offline fallback
       }
-    } catch {
-      // offline fallback
     }
   }
 }
@@ -505,15 +510,17 @@ export class ExerciseRepository {
   }
 
   static async getFavoriteExerciseIds(profileId: string): Promise<string[]> {
-    try {
-      const res: any = await withTimeout(
-        supabase
-          .from('profile_favorite_exercises')
-          .select('exercise_id')
-          .eq('profile_id', profileId)
-      );
-      if (res.data) return res.data.map((d: any) => d.exercise_id);
-    } catch {}
+    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+      try {
+        const res: any = await withTimeout(
+          supabase
+            .from('profile_favorite_exercises')
+            .select('exercise_id')
+            .eq('profile_id', profileId)
+        );
+        if (res.data) return res.data.map((d: any) => d.exercise_id);
+      } catch {}
+    }
 
     const local = localStorage.getItem(this.LOCAL_FAVS_KEY + profileId);
     if (local) {
@@ -529,13 +536,15 @@ export class ExerciseRepository {
 
     localStorage.setItem(this.LOCAL_FAVS_KEY + profileId, JSON.stringify(updated));
 
-    try {
-      if (exists) {
-        await withTimeout(supabase.from('profile_favorite_exercises').delete().match({ profile_id: profileId, exercise_id: exerciseId }));
-      } else {
-        await withTimeout(supabase.from('profile_favorite_exercises').insert({ profile_id: profileId, exercise_id: exerciseId }));
-      }
-    } catch {}
+    if (isUuid(profileId) && !isDummyLocalUuid(profileId)) {
+      try {
+        if (exists) {
+          await withTimeout(supabase.from('profile_favorite_exercises').delete().match({ profile_id: profileId, exercise_id: exerciseId }));
+        } else {
+          await withTimeout(supabase.from('profile_favorite_exercises').insert({ profile_id: profileId, exercise_id: exerciseId }));
+        }
+      } catch {}
+    }
 
     return !exists;
   }

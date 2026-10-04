@@ -28,14 +28,16 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveProfileId: async (id: string | null) => {
     if (id) {
-      localStorage.setItem('cachitas_active_profile_id', id);
       const profile = await ProfileRepository.getProfileById(id);
-      const session = await WorkoutRepository.getActiveSession(id);
-      const prefs = await PreferencesRepository.getPreferences(id);
-      const program = await ProgramRepository.getActiveProgramForProfile(id);
+      const targetId = profile ? profile.id : id;
+      localStorage.setItem('cachitas_active_profile_id', targetId);
+
+      const session = await WorkoutRepository.getActiveSession(targetId);
+      const prefs = await PreferencesRepository.getPreferences(targetId);
+      const program = await ProgramRepository.getActiveProgramForProfile(targetId);
 
       set({
-        activeProfileId: id,
+        activeProfileId: targetId,
         activeProfile: profile,
         activeSession: session,
         preferences: prefs,
@@ -57,9 +59,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const id = get().activeProfileId;
     if (id) {
       const profile = await ProfileRepository.getProfileById(id);
-      const prefs = await PreferencesRepository.getPreferences(id);
-      const program = await ProgramRepository.getActiveProgramForProfile(id);
-      set({ activeProfile: profile, preferences: prefs, activeProgram: program });
+      const targetId = profile ? profile.id : id;
+      if (targetId !== id) {
+        localStorage.setItem('cachitas_active_profile_id', targetId);
+      }
+      const prefs = await PreferencesRepository.getPreferences(targetId);
+      const program = await ProgramRepository.getActiveProgramForProfile(targetId);
+      set({ activeProfileId: targetId, activeProfile: profile, preferences: prefs, activeProgram: program });
     }
   },
 
