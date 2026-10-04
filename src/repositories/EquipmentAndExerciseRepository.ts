@@ -10,23 +10,23 @@ async function withTimeout<T>(promise: PromiseLike<T>, ms = 2000): Promise<T> {
 }
 
 export const SEEDED_EQUIPMENT: EquipmentItem[] = [
-  { id: 'eq-1', name: 'Rack', slug: 'rack', category: 'structure' },
-  { id: 'eq-2', name: 'Barra olímpica', slug: 'barra-olimpica', category: 'free_weights' },
-  { id: 'eq-3', name: 'Discos', slug: 'discos', category: 'free_weights' },
-  { id: 'eq-4', name: 'Banco', slug: 'banco', category: 'benches' },
-  { id: 'eq-5', name: 'Máquina de poleas', slug: 'maquina-de-poleas', category: 'cables' },
-  { id: 'eq-6', name: 'Mancuernas', slug: 'mancuernas', category: 'free_weights' },
-  { id: 'eq-7', name: 'Kettlebells', slug: 'kettlebells', category: 'free_weights' },
-  { id: 'eq-8', name: 'Barra de dominadas', slug: 'barra-de-dominadas', category: 'bodyweight' },
-  { id: 'eq-9', name: 'Anillas', slug: 'anillas', category: 'bodyweight' },
-  { id: 'eq-10', name: 'Bandas', slug: 'bandas', category: 'accessories' },
-  { id: 'eq-11', name: 'Cajón', slug: 'cajon', category: 'conditioning' },
-  { id: 'eq-12', name: 'Elíptica', slug: 'eliptica', category: 'cardio' }
+  { id: '10000000-0000-0000-0000-000000000001', name: 'Rack', slug: 'rack', category: 'structure' },
+  { id: '10000000-0000-0000-0000-000000000002', name: 'Barra olímpica', slug: 'barra-olimpica', category: 'free_weights' },
+  { id: '10000000-0000-0000-0000-000000000003', name: 'Discos', slug: 'discos', category: 'free_weights' },
+  { id: '10000000-0000-0000-0000-000000000004', name: 'Banco', slug: 'banco', category: 'benches' },
+  { id: '10000000-0000-0000-0000-000000000005', name: 'Máquina de poleas', slug: 'maquina-de-poleas', category: 'cables' },
+  { id: '10000000-0000-0000-0000-000000000006', name: 'Mancuernas', slug: 'mancuernas', category: 'free_weights' },
+  { id: '10000000-0000-0000-0000-000000000007', name: 'Kettlebells', slug: 'kettlebells', category: 'free_weights' },
+  { id: '10000000-0000-0000-0000-000000000008', name: 'Barra de dominadas', slug: 'barra-de-dominadas', category: 'bodyweight' },
+  { id: '10000000-0000-0000-0000-000000000009', name: 'Anillas', slug: 'anillas', category: 'bodyweight' },
+  { id: '10000000-0000-0000-0000-000000000010', name: 'Bandas', slug: 'bandas', category: 'accessories' },
+  { id: '10000000-0000-0000-0000-000000000011', name: 'Cajón', slug: 'cajon', category: 'conditioning' },
+  { id: '10000000-0000-0000-0000-000000000012', name: 'Elíptica', slug: 'eliptica', category: 'cardio' }
 ];
 
 export const SEEDED_EXERCISES: Exercise[] = [
   {
-    id: 'ex-1',
+    id: '20000000-0000-0000-0000-000000000001',
     name: 'Back Squat',
     slug: 'back-squat',
     category: 'Squat',
@@ -42,7 +42,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-2',
+    id: '20000000-0000-0000-0000-000000000002',
     name: 'Front Squat',
     slug: 'front-squat',
     category: 'Squat',
@@ -58,7 +58,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-3',
+    id: '20000000-0000-0000-0000-000000000003',
     name: 'Paused Squat',
     slug: 'paused-squat',
     category: 'Squat',
@@ -74,7 +74,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-4',
+    id: '20000000-0000-0000-0000-000000000004',
     name: 'Tempo Squat',
     slug: 'tempo-squat',
     category: 'Squat',
@@ -90,7 +90,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-5',
+    id: '20000000-0000-0000-0000-000000000005',
     name: 'Bulgarian Split Squat',
     slug: 'bulgarian-split-squat',
     category: 'Squat',
@@ -106,7 +106,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-6',
+    id: '20000000-0000-0000-0000-000000000006',
     name: 'Bench Press',
     slug: 'bench-press',
     category: 'Bench',
@@ -122,7 +122,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-7',
+    id: '20000000-0000-0000-0000-000000000007',
     name: 'Paused Bench Press',
     slug: 'paused-bench-press',
     category: 'Bench',
@@ -138,7 +138,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-8',
+    id: '20000000-0000-0000-0000-000000000008',
     name: 'Close Grip Bench Press',
     slug: 'close-grip-bench-press',
     category: 'Bench',
@@ -154,7 +154,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-9',
+    id: '20000000-0000-0000-0000-000000000009',
     name: 'Cable Fly',
     slug: 'cable-fly',
     category: 'Bench',
@@ -170,7 +170,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-10',
+    id: '20000000-0000-0000-0000-000000000010',
     name: 'Deadlift',
     slug: 'deadlift',
     category: 'Deadlift',
@@ -186,7 +186,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-11',
+    id: '20000000-0000-0000-0000-000000000011',
     name: 'Romanian Deadlift',
     slug: 'romanian-deadlift',
     category: 'Deadlift',
@@ -202,7 +202,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-12',
+    id: '20000000-0000-0000-0000-000000000012',
     name: 'Paused Deadlift',
     slug: 'paused-deadlift',
     category: 'Deadlift',
@@ -218,7 +218,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-13',
+    id: '20000000-0000-0000-0000-000000000013',
     name: 'Hip Thrust',
     slug: 'hip-thrust',
     category: 'Deadlift',
@@ -234,7 +234,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-14',
+    id: '20000000-0000-0000-0000-000000000014',
     name: 'Overhead Press',
     slug: 'overhead-press',
     category: 'Upper body',
@@ -250,7 +250,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-15',
+    id: '20000000-0000-0000-0000-000000000015',
     name: 'Barbell Row',
     slug: 'barbell-row',
     category: 'Upper body',
@@ -266,7 +266,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-16',
+    id: '20000000-0000-0000-0000-000000000016',
     name: 'Lat Pulldown',
     slug: 'lat-pulldown',
     category: 'Upper body',
@@ -282,7 +282,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-17',
+    id: '20000000-0000-0000-0000-000000000017',
     name: 'Cable Row',
     slug: 'cable-row',
     category: 'Upper body',
@@ -298,7 +298,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-18',
+    id: '20000000-0000-0000-0000-000000000018',
     name: 'Face Pull',
     slug: 'face-pull',
     category: 'Upper body',
@@ -314,7 +314,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-19',
+    id: '20000000-0000-0000-0000-000000000019',
     name: 'Cable Curl',
     slug: 'cable-curl',
     category: 'Upper body',
@@ -330,7 +330,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-20',
+    id: '20000000-0000-0000-0000-000000000020',
     name: 'Rope Triceps Pushdown',
     slug: 'rope-triceps-pushdown',
     category: 'Upper body',
@@ -346,7 +346,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-21',
+    id: '20000000-0000-0000-0000-000000000021',
     name: 'Cable Lateral Raise',
     slug: 'cable-lateral-raise',
     category: 'Upper body',
@@ -362,7 +362,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-22',
+    id: '20000000-0000-0000-0000-000000000022',
     name: 'Straight Arm Pulldown',
     slug: 'straight-arm-pulldown',
     category: 'Upper body',
@@ -378,7 +378,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-23',
+    id: '20000000-0000-0000-0000-000000000023',
     name: 'Step Up',
     slug: 'step-up',
     category: 'Pierna',
@@ -394,7 +394,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: false
   },
   {
-    id: 'ex-24',
+    id: '20000000-0000-0000-0000-000000000024',
     name: 'Elliptical Zone 2',
     slug: 'elliptical-zone-2',
     category: 'Conditioning',
@@ -410,7 +410,7 @@ export const SEEDED_EXERCISES: Exercise[] = [
     is_conditioning: true
   },
   {
-    id: 'ex-25',
+    id: '20000000-0000-0000-0000-000000000025',
     name: 'Elliptical Intervals',
     slug: 'elliptical-intervals',
     category: 'Conditioning',
