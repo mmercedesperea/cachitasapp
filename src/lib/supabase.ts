@@ -4,7 +4,14 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.su
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key';
 
 function checkKeySecurity(key: string) {
-  if (!key || key === 'placeholder-key') return;
+  if (!key || key === 'placeholder-key' || key === 'your-actual-anon-public-key') {
+    console.error(
+      '[Supabase Configuration Error] VITE_SUPABASE_ANON_KEY is missing or set to a placeholder!\n' +
+      'Please create or update `.env` or `.env.local` with your actual Supabase `anon` public key.\n' +
+      'Get it from: Supabase Dashboard -> Project Settings -> API -> Project API keys -> anon (public).'
+    );
+    return;
+  }
   const isSecretKey =
     key.startsWith('sbp_') ||
     key.startsWith('sb_sk_') ||
