@@ -131,6 +131,7 @@ export class SyncService {
                       });
                       if (exercises && Array.isArray(exercises)) {
                         for (const ex of exercises) {
+                          if (!isUuid(ex.exercise_id)) continue;
                           const { exercise, ...exData } = ex;
                           await supabase.from('program_exercises').upsert(exData);
                         }
@@ -153,6 +154,7 @@ export class SyncService {
               success = true;
               if (exercises && Array.isArray(exercises)) {
                 for (const ex of exercises) {
+                  if (!isUuid(ex.exercise_id)) continue;
                   const { sets, exercise, ...exData } = ex;
                   await supabase.from('workout_exercises').upsert(exData);
                   if (sets && Array.isArray(sets)) {
@@ -166,7 +168,7 @@ export class SyncService {
           }
         } else if (op.table === 'personal_records') {
           const pr = op.data;
-          if (pr && isUuid(pr.profile_id)) {
+          if (pr && isUuid(pr.profile_id) && isUuid(pr.exercise_id)) {
             const { exercise, ...prData } = pr;
             const resPr: any = await supabase.from('personal_records').upsert({
               ...prData,
