@@ -477,10 +477,10 @@ export class EquipmentRepository {
         const allEq = await this.getAllEquipment();
         const rows = slugs
           .map(slug => allEq.find(e => e.slug === slug))
-          .filter(Boolean)
+          .filter((eq): eq is EquipmentItem => Boolean(eq && isUuid(eq.id)))
           .map(eq => ({
             profile_id: profileId,
-            equipment_id: eq!.id
+            equipment_id: eq.id
           }));
 
         if (rows.length > 0) {
@@ -539,7 +539,7 @@ export class ExerciseRepository {
 
     localStorage.setItem(this.LOCAL_FAVS_KEY + profileId, JSON.stringify(updated));
 
-    if (isUuid(profileId)) {
+    if (isUuid(profileId) && isUuid(exerciseId)) {
       try {
         if (exists) {
           const delRes: any = await withTimeout(supabase.from('profile_favorite_exercises').delete().match({ profile_id: profileId, exercise_id: exerciseId }));

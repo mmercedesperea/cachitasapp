@@ -128,7 +128,9 @@ export class ProgramRepository {
 
         const exerciseRows = structuredWeeks.flatMap(w =>
           (w.days || []).flatMap(d =>
-            (d.exercises || []).map(({ exercise, ...exData }) => exData)
+            (d.exercises || [])
+              .filter(ex => isUuid(ex.exercise_id))
+              .map(({ exercise, ...exData }) => exData)
           )
         );
         if (exerciseRows.length > 0) {
@@ -280,6 +282,7 @@ export class WorkoutRepository {
 
         if (exercises) {
           for (const ex of exercises) {
+            if (!isUuid(ex.exercise_id)) continue;
             const { sets, exercise, ...exData } = ex;
             const resEx: any = await supabase.from('workout_exercises').upsert(exData);
             if (resEx.error) throw resEx.error;
@@ -339,7 +342,7 @@ export class PersonalRecordRepository {
     }
     localStorage.setItem(this.LOCAL_PRS_KEY + pr.profile_id, JSON.stringify(prs));
 
-    if (isUuid(pr.profile_id)) {
+    if (isUuid(pr.profile_id) && isUuid(pr.exercise_id)) {
       try {
         const { exercise, ...prData } = pr;
         const resPr: any = await supabase.from('personal_records').upsert(prData);
