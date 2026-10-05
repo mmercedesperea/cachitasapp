@@ -150,30 +150,36 @@ export class ProgramRepository {
   static async getProgramWeeks(programId: string): Promise<(ProgramWeek & { days: (ProgramDay & { exercises: ProgramExercise[] })[] })[]> {
     if (isUuid(programId)) {
       try {
-        const { data: weeks, error: weekErr } = await supabase
-          .from('program_weeks')
-          .select('*')
-          .eq('program_id', programId)
-          .order('week_number', { ascending: true });
+        const res: any = await withTimeout(
+          supabase
+            .from('program_weeks')
+            .select('*')
+            .eq('program_id', programId)
+            .order('week_number', { ascending: true })
+        );
 
-        if (!weekErr && weeks && weeks.length > 0) {
+        if (!res.error && res.data && res.data.length > 0) {
           const result = [];
-          for (const week of weeks) {
-            const { data: days, error: dayErr } = await supabase
-              .from('program_days')
-              .select('*')
-              .eq('program_week_id', week.id)
-              .order('day_number', { ascending: true });
+          for (const week of res.data) {
+            const resDays: any = await withTimeout(
+              supabase
+                .from('program_days')
+                .select('*')
+                .eq('program_week_id', week.id)
+                .order('day_number', { ascending: true })
+            );
 
             const daysWithExercises = [];
-            if (!dayErr && days && days.length > 0) {
-              for (const day of days) {
-                const { data: exercises } = await supabase
-                  .from('program_exercises')
-                  .select('*, exercise:exercise_id(*)')
-                  .eq('program_day_id', day.id)
-                  .order('exercise_order', { ascending: true });
-                daysWithExercises.push({ ...day, exercises: exercises || [] });
+            if (!resDays.error && resDays.data && resDays.data.length > 0) {
+              for (const day of resDays.data) {
+                const resEx: any = await withTimeout(
+                  supabase
+                    .from('program_exercises')
+                    .select('*, exercise:exercise_id(*)')
+                    .eq('program_day_id', day.id)
+                    .order('exercise_order', { ascending: true })
+                );
+                daysWithExercises.push({ ...day, exercises: (!resEx.error && resEx.data) || [] });
               }
             }
             result.push({ ...week, days: daysWithExercises });
@@ -211,21 +217,25 @@ export class ProgramRepository {
   static async getProgramDays(programId: string): Promise<(ProgramDay & { exercises: ProgramExercise[] })[]> {
     if (isUuid(programId)) {
       try {
-        const { data: days, error: dayErr } = await supabase
-          .from('program_days')
-          .select('*')
-          .eq('program_id', programId)
-          .order('day_number', { ascending: true });
+        const res: any = await withTimeout(
+          supabase
+            .from('program_days')
+            .select('*')
+            .eq('program_id', programId)
+            .order('day_number', { ascending: true })
+        );
 
-        if (!dayErr && days && days.length > 0) {
+        if (!res.error && res.data && res.data.length > 0) {
           const result = [];
-          for (const day of days) {
-            const { data: exercises } = await supabase
-              .from('program_exercises')
-              .select('*, exercise:exercise_id(*)')
-              .eq('program_day_id', day.id)
-              .order('exercise_order', { ascending: true });
-            result.push({ ...day, exercises: exercises || [] });
+          for (const day of res.data) {
+            const resEx: any = await withTimeout(
+              supabase
+                .from('program_exercises')
+                .select('*, exercise:exercise_id(*)')
+                .eq('program_day_id', day.id)
+                .order('exercise_order', { ascending: true })
+            );
+            result.push({ ...day, exercises: (!resEx.error && resEx.data) || [] });
           }
           return result;
         }
