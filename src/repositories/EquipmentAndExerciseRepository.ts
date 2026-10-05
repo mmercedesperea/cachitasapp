@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { EquipmentItem, Exercise } from '../types';
+import { ProfileRepository } from './ProfileRepository';
 import { isUuid, isDummyLocalUuid } from '../utils/uuid';
 
 async function withTimeout<T>(promise: PromiseLike<T>, ms = 2000): Promise<T> {
@@ -471,6 +472,7 @@ export class EquipmentRepository {
     localStorage.setItem(this.LOCAL_EQ_KEY + profileId, JSON.stringify(slugs));
     if (isUuid(profileId)) {
       try {
+        await ProfileRepository.ensureProfileExistsInSupabase(profileId);
         const delRes: any = await withTimeout(supabase.from('profile_equipment').delete().eq('profile_id', profileId));
         if (delRes.error) throw delRes.error;
 
@@ -541,6 +543,7 @@ export class ExerciseRepository {
 
     if (isUuid(profileId) && isUuid(exerciseId)) {
       try {
+        await ProfileRepository.ensureProfileExistsInSupabase(profileId);
         if (exists) {
           const delRes: any = await withTimeout(supabase.from('profile_favorite_exercises').delete().match({ profile_id: profileId, exercise_id: exerciseId }));
           if (delRes.error) throw delRes.error;

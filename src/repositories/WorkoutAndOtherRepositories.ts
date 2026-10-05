@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Program, ProgramWeek, ProgramDay, ProgramExercise, WorkoutSession, WorkoutExercise, WorkoutSet, PersonalRecord, BodyWeightEntry, ProfilePreferences } from '../types';
+import { ProfileRepository } from './ProfileRepository';
 import { SyncService } from '../services/SyncService';
 import { isUuid, isDummyLocalUuid, generateUuid } from '../utils/uuid';
 
@@ -96,6 +97,7 @@ export class ProgramRepository {
 
     if (isUuid(program.profile_id)) {
       try {
+        await ProfileRepository.ensureProfileExistsInSupabase(program.profile_id);
         const resProg: any = await supabase.from('programs').upsert({
           id: program.id,
           profile_id: program.profile_id,
@@ -276,6 +278,7 @@ export class WorkoutRepository {
 
     if (isUuid(session.profile_id)) {
       try {
+        await ProfileRepository.ensureProfileExistsInSupabase(session.profile_id);
         const { exercises, ...sessionData } = session;
         const resSess: any = await supabase.from('workout_sessions').upsert(sessionData);
         if (resSess.error) throw resSess.error;
@@ -317,10 +320,12 @@ export class PersonalRecordRepository {
   static async getPRsForProfile(profileId: string): Promise<PersonalRecord[]> {
     if (isUuid(profileId)) {
       try {
-        const res: any = await supabase
-          .from('personal_records')
-          .select('*, exercise:exercise_id(*)')
-          .eq('profile_id', profileId);
+        const res: any = await withTimeout(
+          supabase
+            .from('personal_records')
+            .select('*, exercise:exercise_id(*)')
+            .eq('profile_id', profileId)
+        );
         if (res.data && !res.error) return res.data;
       } catch {}
     }
@@ -344,6 +349,7 @@ export class PersonalRecordRepository {
 
     if (isUuid(pr.profile_id) && isUuid(pr.exercise_id)) {
       try {
+        await ProfileRepository.ensureProfileExistsInSupabase(pr.profile_id);
         const { exercise, ...prData } = pr;
         const resPr: any = await supabase.from('personal_records').upsert(prData);
         if (resPr.error) throw resPr.error;
@@ -364,11 +370,13 @@ export class BodyWeightRepository {
   static async getEntriesForProfile(profileId: string): Promise<BodyWeightEntry[]> {
     if (isUuid(profileId)) {
       try {
-        const res: any = await supabase
-          .from('body_weight_entries')
-          .select('*')
-          .eq('profile_id', profileId)
-          .order('recorded_at', { ascending: true });
+        const res: any = await withTimeout(
+          supabase
+            .from('body_weight_entries')
+            .select('*')
+            .eq('profile_id', profileId)
+            .order('recorded_at', { ascending: true })
+        );
         if (res.data && !res.error) return res.data;
       } catch {}
     }
@@ -393,6 +401,7 @@ export class BodyWeightRepository {
 
     if (isUuid(profileId)) {
       try {
+        await ProfileRepository.ensureProfileExistsInSupabase(profileId);
         const resBw: any = await supabase.from('body_weight_entries').insert(entry);
         if (resBw.error) throw resBw.error;
       } catch {
@@ -445,6 +454,7 @@ export class PreferencesRepository {
     localStorage.setItem(this.LOCAL_PREFS_KEY + prefs.profile_id, JSON.stringify(prefs));
     if (isUuid(prefs.profile_id)) {
       try {
+        await ProfileRepository.ensureProfileExistsInSupabase(prefs.profile_id);
         const resPrefs: any = await supabase.from('profile_preferences').upsert(prefs);
         if (resPrefs.error) throw resPrefs.error;
       } catch {}

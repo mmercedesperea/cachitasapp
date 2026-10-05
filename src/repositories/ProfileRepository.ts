@@ -74,6 +74,54 @@ export class ProfileRepository {
     }
   }
 
+  public static async ensureProfileExistsInSupabase(profileId: string): Promise<void> {
+    if (!isUuid(profileId)) return;
+    try {
+      const checkRes: any = await withTimeout(
+        supabase.from('profiles').select('id').eq('id', profileId).maybeSingle()
+      );
+      if (!checkRes.error && checkRes.data) return;
+
+      const localProfiles = this.getLocalProfiles();
+      let profileToUpsert = localProfiles.find(p => p.id === profileId);
+
+      if (!profileToUpsert) {
+        const slotMatch = profileId.match(/00000000-0000-0000-0000-00000000000(\d)/);
+        const slot = slotMatch ? parseInt(slotMatch[1], 10) : 1;
+        profileToUpsert = {
+          id: profileId,
+          slot,
+          name: null,
+          age: null,
+          height_cm: null,
+          weight_kg: null,
+          experience_level: null,
+          primary_goal: null,
+          unit_system: 'metric',
+          avatar: null,
+          onboarding_completed: false,
+          pin_hash: null,
+          pin_enabled: false,
+          pin_attempts: 0,
+          pin_locked_until: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      }
+
+      const upsertRes: any = await withTimeout(
+        supabase.from('profiles').upsert(profileToUpsert, { onConflict: 'slot' })
+      );
+      if (upsertRes.error) {
+        await withTimeout(
+          supabase.from('profiles').upsert(profileToUpsert)
+        );
+      }
+    } catch {
+      // Ignore offline or network errors
+    }
+  }
+
   static async getAllProfiles(): Promise<Profile[]> {
     const localProfiles = this.getLocalProfiles();
     try {

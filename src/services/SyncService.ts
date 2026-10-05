@@ -1,5 +1,6 @@
 import { openDB, IDBPDatabase } from 'idb';
 import { supabase } from '../lib/supabase';
+import { ProfileRepository } from '../repositories/ProfileRepository';
 import { isUuid, generateUuid } from '../utils/uuid';
 
 export interface PendingSyncOperation {
@@ -104,6 +105,7 @@ export class SyncService {
           const { program, weeks } = op.data;
           const programData = program || op.data;
           if (programData && isUuid(programData.profile_id)) {
+            await ProfileRepository.ensureProfileExistsInSupabase(programData.profile_id);
             const progRes: any = await supabase.from('programs').upsert({
               id: isUuid(programData.id) ? programData.id : generateUuid(),
               profile_id: programData.profile_id,
@@ -145,6 +147,7 @@ export class SyncService {
         } else if (op.table === 'workout_sessions') {
           const session = op.data;
           if (session && isUuid(session.profile_id)) {
+            await ProfileRepository.ensureProfileExistsInSupabase(session.profile_id);
             const { exercises, ...sessionData } = session;
             const resSess: any = await supabase.from('workout_sessions').upsert({
               ...sessionData,
@@ -169,6 +172,7 @@ export class SyncService {
         } else if (op.table === 'personal_records') {
           const pr = op.data;
           if (pr && isUuid(pr.profile_id) && isUuid(pr.exercise_id)) {
+            await ProfileRepository.ensureProfileExistsInSupabase(pr.profile_id);
             const { exercise, ...prData } = pr;
             const resPr: any = await supabase.from('personal_records').upsert({
               ...prData,
@@ -179,6 +183,7 @@ export class SyncService {
         } else if (op.table === 'body_weight_entries') {
           const bw = op.data;
           if (bw && isUuid(bw.profile_id)) {
+            await ProfileRepository.ensureProfileExistsInSupabase(bw.profile_id);
             const resBw: any = await supabase.from('body_weight_entries').insert({
               ...bw,
               id: isUuid(bw.id) ? bw.id : generateUuid()
