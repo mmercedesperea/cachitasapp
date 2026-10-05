@@ -92,6 +92,11 @@ describe('Repositories and UUID handling', () => {
     expect(entries.some(e => e.id === entry.id)).toBe(true);
   });
 
+  it('ProfileRepository.ensureProfileExistsInSupabase runs without error for valid UUID', async () => {
+    const profileId = '00000000-0000-0000-0000-000000000001';
+    await expect(ProfileRepository.ensureProfileExistsInSupabase(profileId)).resolves.not.toThrow();
+  });
+
   it('SyncService processQueue handles empty queue gracefully', async () => {
     const res = await SyncService.processQueue();
     expect(res).toEqual({ syncedCount: 0, remainingCount: 0 });
